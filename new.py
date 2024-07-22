@@ -17,7 +17,9 @@ def generate_response(prompt, api_key):
             prompt=f"{anthropic.HUMAN_PROMPT} {prompt}{anthropic.AI_PROMPT}",
             model="claude-2",
             max_tokens_to_sample=300,
-            stop_sequences=[anthropic.HUMAN_PROMPT]
+            stop_sequences=[anthropic.HUMAN_PROMPT],
+            # 여기에 anthropic-version 헤더를 추가합니다
+            extra_headers={"anthropic-version": "2023-06-01"}
         )
         return response.completion.strip()
     except Exception as e:
