@@ -17,7 +17,7 @@ def generate_response(prompt, api_key):
     try:
         client = init_anthropic_client(api_key)
         message = client.messages.create(
-            model="claude-2",
+            model="claude-2.1",  # 여기를 "claude-2.1"로 변경
             max_tokens=300,
             messages=[
                 {"role": "user", "content": prompt}
