@@ -12,15 +12,14 @@ if 'api_key' not in st.session_state:
 def generate_response(prompt, api_key):
     """Generate a response using Claude API."""
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
+        client = anthropic.Client(api_key=api_key)
+        response = client.completion(
+            prompt=f"{anthropic.HUMAN_PROMPT} {prompt}{anthropic.AI_PROMPT}",
             model="claude-2",
-            max_tokens=300,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            max_tokens_to_sample=300,
+            stop_sequences=[anthropic.HUMAN_PROMPT]
         )
-        return message.content[0].text
+        return response.completion.strip()
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
