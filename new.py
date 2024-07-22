@@ -17,8 +17,8 @@ def generate_response(prompt, api_key):
     try:
         client = init_anthropic_client(api_key)
         message = client.messages.create(
-            model="claude-2.1",  # 여기를 "claude-2.1"로 변경
-            max_tokens=300,
+            model="claude-2.1",
+            max_tokens=1000,  # 토큰 수 증가
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -31,7 +31,8 @@ def generate_response(prompt, api_key):
 def generate_website_code(requirements, api_key):
     """Generate website HTML code based on user requirements."""
     prompt = f"""다음 요구사항을 바탕으로 간단한 HTML 웹사이트를 만들어주세요: {requirements}. 
-    전체 HTML 구조를 제공해 주시고, <style> 태그 내에 CSS도 포함해 주세요. 
+    전체 HTML 구조를 제공해 주시고, <style> 태그 내에 기본적인 CSS도 포함해 주세요. 
+    반응형 디자인을 위해 미디어 쿼리도 포함해 주세요.
     설명은 생략하고 HTML 코드만 제공해 주세요."""
     response = generate_response(prompt, api_key)
     if response:
@@ -75,7 +76,11 @@ if st.session_state.api_key:
     # Chat interface
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            if len(message["content"]) > 500:  # 긴 메시지의 경우
+                with st.expander("전체 메시지 보기"):
+                    st.markdown(message["content"])
+            else:
+                st.markdown(message["content"])
     
     if prompt := st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:"):
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -91,8 +96,8 @@ if st.session_state.api_key:
             st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
             
             # Display generated code
-            st.subheader("생성된 HTML 코드")
-            st.code(st.session_state.website_code, language="html")
+            with st.expander("생성된 HTML 코드 보기"):
+                st.code(st.session_state.website_code, language="html")
             
             # Display website preview
             st.subheader("웹사이트 미리보기")
