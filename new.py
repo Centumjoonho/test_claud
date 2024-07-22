@@ -47,11 +47,36 @@ def generate_website_code(requirements, api_key):
 # Streamlit UI
 st.title("AI 웹사이트 생성기 (Claude 버전)")
 
-# (API 키 입력 및 유효성 검사 부분은 그대로 유지)
+# API 키 입력
+api_key = st.text_input("Anthropic API 키를 입력해주세요:", type="password")
+if api_key:
+    st.session_state.api_key = api_key
+    try:
+        # API 키 유효성 검사
+        client = init_anthropic_client(api_key)
+        st.success("API 키가 유효합니다.")
+    except Exception as e:
+        st.error(f"API 키가 유효하지 않습니다: {str(e)}")
+        st.session_state.api_key = ""
 
 if st.session_state.api_key:
-    # (이전 코드는 그대로 유지)
-
+    # User input form
+    with st.form("company_info"):
+        company_name = st.text_input("회사명을 입력해주세요:")
+        industry = st.text_input("업종을 입력해주세요:")
+        submit_button = st.form_submit_button("대화 시작하기")
+    
+    if submit_button:
+        st.session_state.messages.append({
+        "role": "system", 
+        "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
+    })
+    
+    # Chat interface
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
     if prompt := st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
