@@ -1,5 +1,5 @@
 import streamlit as st
-import anthropic
+from anthropic import Anthropic
 
 # Initialize session state
 if 'messages' not in st.session_state:
@@ -12,16 +12,15 @@ if 'api_key' not in st.session_state:
 def generate_response(prompt, api_key):
     """Generate a response using Claude API."""
     try:
-        client = anthropic.Client(api_key=api_key)
-        response = client.completion(
-            prompt=f"{anthropic.HUMAN_PROMPT} {prompt}{anthropic.AI_PROMPT}",
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
             model="claude-2",
-            max_tokens_to_sample=300,
-            stop_sequences=[anthropic.HUMAN_PROMPT],
-            # 여기에 anthropic-version 헤더를 추가합니다
-            extra_headers={"anthropic-version": "2023-06-01"}
+            max_tokens=300,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
         )
-        return response.completion.strip()
+        return message.content[0].text
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
