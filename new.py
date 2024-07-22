@@ -12,7 +12,12 @@ if 'api_key' not in st.session_state:
 def generate_response(prompt, api_key):
     """Generate a response using Claude API."""
     try:
-        client = anthropic.Client(api_key=api_key)
+        client = anthropic.Client(
+            api_key=api_key,
+            # 여기에 anthropic-version 헤더를 추가합니다
+            default_headers={"anthropic-version": "2023-06-01"}
+            )
+        
         response = client.completion(
             prompt=f"{anthropic.HUMAN_PROMPT} {prompt}{anthropic.AI_PROMPT}",
             model="claude-2",
