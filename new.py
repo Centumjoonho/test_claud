@@ -18,7 +18,7 @@ def generate_response(prompt, api_key):
         client = init_anthropic_client(api_key)
         message = client.messages.create(
             model="claude-2.1",
-            max_tokens=1000,  # 토큰 수 증가
+            max_tokens=2000,  # 토큰 수 증가
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -30,19 +30,27 @@ def generate_response(prompt, api_key):
 
 def generate_website_code(requirements, api_key):
     """Generate website HTML code based on user requirements."""
-    prompt = f"""다음 요구사항을 바탕으로 간단한 HTML 웹사이트를 만들어주세요: {requirements}. 
-    전체 HTML 구조를 제공해 주시고, <style> 태그 내에 기본적인 CSS도 포함해 주세요. 
-    반응형 디자인을 위해 미디어 쿼리도 포함해 주세요.
-    설명은 생략하고 HTML 코드만 제공해 주세요."""
+    
+    prompt = f"""다음 요구사항을 바탕으로 HTML 웹사이트를 만들어주세요: {requirements}
+    응답은 반드시 완전한 HTML 구조여야 합니다. <html>, <head>, <body> 태그를 모두 포함해야 합니다.
+    <style> 태그 내에 기본적인 CSS를 포함하고, 반응형 디자인을 위한 미디어 쿼리도 추가해주세요.
+    설명이나 주석은 생략하고 순수한 HTML 코드만 제공해 주세요.
+    응답은 반드시 <!DOCTYPE html>로 시작해야 합니다."""
+    
+    st.write("prompt 내용:", prompt)
+    
     response = generate_response(prompt, api_key)
+    
     if response:
-        # HTML 코드만 추출 (주석 등 제거)
+        # 디버깅을 위해 전체 응답 로깅
+        st.write("API 응답:", response)
+        
+        # HTML 코드 추출 (더 유연한 방식)
         html_code = response.strip()
-        if html_code.startswith("```html"):
-            html_code = html_code[7:]
-        if html_code.endswith("```"):
-            html_code = html_code[:-3]
-        return html_code.strip()
+        if "<!DOCTYPE html>" in html_code:
+            html_code = html_code[html_code.index("<!DOCTYPE html>"):]
+        return html_code
+    
     return "<!-- 웹사이트 코드를 생성할 수 없습니다 -->"
 
 # Streamlit UI
@@ -95,13 +103,16 @@ if st.session_state.api_key:
             website_requirements = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
             st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
             
-            # Display generated code
-            with st.expander("생성된 HTML 코드 보기"):
-                st.code(st.session_state.website_code, language="html")
+            # 생성된 코드 표시 (항상 표시)
+            st.subheader("생성된 HTML 코드")
+            st.code(st.session_state.website_code, language="html")
             
-            # Display website preview
-            st.subheader("웹사이트 미리보기")
-            st.components.v1.html(st.session_state.website_code, height=600, scrolling=True)
+            # 웹사이트 미리보기
+            if st.session_state.website_code.startswith("<!DOCTYPE html>"):
+                st.subheader("웹사이트 미리보기")
+                st.components.v1.html(st.session_state.website_code, height=600, scrolling=True)
+            else:
+                st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
     # Reset conversation
     if st.button("대화 초기화"):
