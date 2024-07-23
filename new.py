@@ -107,8 +107,8 @@ if st.session_state.api_key:
     # 디버그 정보 및 생성된 코드 표시
     if st.session_state.website_code:
         with st.expander("디버그 정보", expanded=False):
-            st.write("프롬프트 내용:", prompt)
-            st.write("API 응답:", response)
+            st.write("웹사이트 요구사항:", website_requirements)
+            st.write("생성된 HTML 코드 길이:", len(st.session_state.website_code))
         
         with st.expander("생성된 HTML 코드 보기", expanded=False):
             st.code(st.session_state.website_code, language="html")
