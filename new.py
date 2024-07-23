@@ -103,11 +103,13 @@ if st.session_state.api_key:
     if st.button("웹사이트 생성하기"):
         website_requirements = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
         st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
+        st.session_state.website_requirements = website_requirements  # 요구사항 저장
     
     # 디버그 정보 및 생성된 코드 표시
-    if st.session_state.website_code:
+    if 'website_code' in st.session_state and st.session_state.website_code:
         with st.expander("디버그 정보", expanded=False):
-            st.write("웹사이트 요구사항:", website_requirements)
+            if 'website_requirements' in st.session_state:
+                st.write("웹사이트 요구사항:", st.session_state.website_requirements)
             st.write("생성된 HTML 코드 길이:", len(st.session_state.website_code))
         
         with st.expander("생성된 HTML 코드 보기", expanded=False):
@@ -122,6 +124,8 @@ if st.session_state.api_key:
     if st.button("대화 초기화"):
         st.session_state.messages = []
         st.session_state.website_code = ""
+        if 'website_requirements' in st.session_state:
+            del st.session_state.website_requirements
         st.experimental_rerun()
 else:
     st.warning("애플리케이션을 사용하려면 Anthropic API 키를 입력해주세요.")
