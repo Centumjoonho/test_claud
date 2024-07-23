@@ -31,13 +31,19 @@ def generate_response(prompt, api_key):
 def generate_website_code(requirements, api_key):
     """Generate website HTML code based on user requirements."""
     
-    prompt = f"""다음 요구사항을 바탕으로 HTML 웹사이트를 만들어주세요: {requirements}
-    응답은 반드시 완전한 HTML 구조여야 합니다. <html>, <head>, <body> 태그를 모두 포함해야 합니다.
-    <style> 태그 내에 기본적인 CSS를 포함하고, 반응형 디자인을 위한 미디어 쿼리도 추가해주세요.
-    설명이나 주석은 생략하고 순수한 HTML 코드만 제공해 주세요.
-    응답은 반드시 <!DOCTYPE html>로 시작해야 합니다."""
+    prompt = f"""당신은 웹 개발자입니다. 다음 요구사항을 바탕으로 완전한 HTML 웹사이트를 만들어주세요: {requirements}
+
+    반드시 다음 사항을 지켜주세요:
+    1. 응답은 완전한 HTML 구조여야 합니다. <!DOCTYPE html>, <html>, <head>, <body> 태그를 모두 포함해야 합니다.
+    2. <style> 태그 내에 기본적인 CSS를 포함하고, 반응형 디자인을 위한 미디어 쿼리도 추가해주세요.
+    3. 설명이나 주석은 생략하고 순수한 HTML 코드만 제공해 주세요.
+    4. 응답은 반드시 <!DOCTYPE html>로 시작해야 합니다.
+    5. 요구사항에 맞는 실제 콘텐츠를 포함해야 합니다.
+    6. 네비게이션 메뉴, 헤더, 푸터 등 기본적인 웹사이트 구조를 포함해주세요.
+
+    HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다."""
     
-    st.write("prompt 내용:", prompt)
+    st.write("프롬프트 내용:", prompt)
     
     response = generate_response(prompt, api_key)
     
@@ -103,9 +109,9 @@ if st.session_state.api_key:
             website_requirements = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
             st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
             
-            # 생성된 코드 표시 (항상 표시)
-            st.subheader("생성된 HTML 코드")
-            st.code(st.session_state.website_code, language="html")
+            # 생성된 코드 표시
+            with st.expander("생성된 HTML 코드 보기"):
+                st.code(st.session_state.website_code, language="html")
             
             # 웹사이트 미리보기
             if st.session_state.website_code.startswith("<!DOCTYPE html>"):
