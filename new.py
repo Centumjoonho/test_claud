@@ -1,3 +1,4 @@
+import logging
 import streamlit as st
 from anthropic import Anthropic
 
@@ -43,7 +44,8 @@ def generate_website_code(requirements, api_key):
 
     HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다."""
     
-    st.write("프롬프트 내용:", prompt)
+    # 로그에 프롬프트 내용 기록
+    logging.info(f"프롬프트 내용: {prompt}")
     
     response = generate_response(prompt, api_key)
     
@@ -108,6 +110,11 @@ if st.session_state.api_key:
         if st.button("웹사이트 생성하기"):
             website_requirements = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
             st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
+            
+            # 디버그 정보 표시
+        with st.expander("디버그 정보", expanded=False):
+            st.write("프롬프트 내용:", prompt)
+            st.write("API 응답:", response)
             
             # 생성된 코드 표시
             with st.expander("생성된 HTML 코드 보기"):
