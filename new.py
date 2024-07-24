@@ -3,34 +3,28 @@ import streamlit as st
 from anthropic import Anthropic
 import time
 from functools import lru_cache
-import os
-
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-
 
 # Initialize session state
 if 'messages' not in st.session_state:
     st.session_state.messages = []
 if 'website_code' not in st.session_state:
     st.session_state.website_code = ""
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = ""
 
-def get_api_key():
-     return st.secrets["ANTHROPIC_API_KEY"]
-
-def init_anthropic_client():
-    api_key = get_api_key()
+def init_anthropic_client(api_key):
     return Anthropic(api_key=api_key)
 
 @lru_cache(maxsize=100)
-def generate_response(prompt):
+def generate_response(prompt, api_key):
     """Generate a response using Claude API with retry logic and caching."""
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            client = init_anthropic_client()
+            client = init_anthropic_client(api_key)
             message = client.messages.create(
                 model="claude-2.1",
                 max_tokens=2000,
@@ -50,7 +44,7 @@ def generate_response(prompt):
                 return None
     return None
 
-def generate_website_code(requirements):
+def generate_website_code(requirements, api_key):
     """Generate website HTML code based on user requirements."""
     prompt = f"""당신은 웹 개발자입니다. 다음 요구사항을 바탕으로 완전한 HTML 웹사이트를 만들어주세요: {requirements}
 
@@ -66,7 +60,7 @@ def generate_website_code(requirements):
     
     logging.info(f"프롬프트 내용: {prompt}")
     
-    response = generate_response(prompt)
+    response = generate_response(prompt, api_key)
     
     if response:
         logging.info(f"API 응답 길이: {len(response)}")
@@ -80,69 +74,74 @@ def generate_website_code(requirements):
 # Streamlit UI
 st.title("AI 웹사이트 생성기 (Claude 버전)")
 
-# 입력 유효성 검사 함수
-def validate_input(input_text, field_name):
-    if not input_text.strip():
-        st.error(f"{field_name}을(를) 입력해주세요.")
-        return False
-    return True
+# API 키 입력 부분은 그대로 유지
 
-with st.form("company_info"):
-    company_name = st.text_input("회사명을 입력해주세요:")
-    industry = st.text_input("업종을 입력해주세요:")
-    submit_button = st.form_submit_button("대화 시작하기")
+if st.session_state.api_key:
+    # 입력 유효성 검사 함수
+    def validate_input(input_text, field_name):
+        if not input_text.strip():
+            st.error(f"{field_name}을(를) 입력해주세요.")
+            return False
+        return True
 
-if submit_button and validate_input(company_name, "회사명") and validate_input(industry, "업종"):
-    st.session_state.messages.append({
-        "role": "system", 
-        "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
-    })
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        if len(message["content"]) > 500:
-            with st.expander("전체 메시지 보기"):
+    with st.form("company_info"):
+        company_name = st.text_input("회사명을 입력해주세요:")
+        industry = st.text_input("업종을 입력해주세요:")
+        submit_button = st.form_submit_button("대화 시작하기")
+    
+    if submit_button and validate_input(company_name, "회사명") and validate_input(industry, "업종"):
+        st.session_state.messages.append({
+            "role": "system", 
+            "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
+        })
+    
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            if len(message["content"]) > 500:
+                with st.expander("전체 메시지 보기"):
+                    st.markdown(message["content"])
+            else:
                 st.markdown(message["content"])
+    
+    prompt = st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:")
+    if prompt:
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.spinner('AI가 응답을 생성 중입니다...'):
+            response = generate_response(prompt, st.session_state.api_key)
+        if response:
+            st.session_state.messages.append({"role": "assistant", "content": response})
+    
+    if st.button("웹사이트 생성하기"):
+        website_requirements = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
+        with st.spinner('웹사이트를 생성 중입니다...'):
+            progress_bar = st.progress(0)
+            for percent_complete in range(100):
+                time.sleep(0.1)  # 실제 생성 시간에 맞게 조정 필요
+                progress_bar.progress(percent_complete + 1)
+            st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
+        st.session_state.website_requirements = website_requirements  # 요구사항 저장
+    
+    # 디버그 정보 및 생성된 코드 표시
+    if 'website_code' in st.session_state and st.session_state.website_code:
+        with st.expander("디버그 정보", expanded=False):
+            if 'website_requirements' in st.session_state:
+                st.write("웹사이트 요구사항:", st.session_state.website_requirements)
+            st.write("생성된 HTML 코드 길이:", len(st.session_state.website_code))
+        
+        with st.expander("생성된 HTML 코드 보기", expanded=False):
+            st.code(st.session_state.website_code, language="html")
+        
+        if st.session_state.website_code.startswith("<!DOCTYPE html>"):
+            st.subheader("웹사이트 미리보기")
+            st.components.v1.html(st.session_state.website_code, height=600, scrolling=True)
         else:
-            st.markdown(message["content"])
+            st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
-prompt = st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:")
-if prompt:
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.spinner('AI가 응답을 생성 중입니다...'):
-        response = generate_response(prompt)
-    if response:
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-if st.button("웹사이트 생성하기"):
-    website_requirements = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
-    with st.spinner('웹사이트를 생성 중입니다...'):
-        progress_bar = st.progress(0)
-        for percent_complete in range(100):
-            time.sleep(0.1)  # 실제 생성 시간에 맞게 조정 필요
-            progress_bar.progress(percent_complete + 1)
-        st.session_state.website_code = generate_website_code(website_requirements)
-    st.session_state.website_requirements = website_requirements  # 요구사항 저장
-
-# 디버그 정보 및 생성된 코드 표시
-if 'website_code' in st.session_state and st.session_state.website_code:
-    with st.expander("디버그 정보", expanded=False):
+    if st.button("대화 초기화"):
+        st.session_state.messages = []
+        st.session_state.website_code = ""
         if 'website_requirements' in st.session_state:
-            st.write("웹사이트 요구사항:", st.session_state.website_requirements)
-        st.write("생성된 HTML 코드 길이:", len(st.session_state.website_code))
-    
-    with st.expander("생성된 HTML 코드 보기", expanded=False):
-        st.code(st.session_state.website_code, language="html")
-    
-    if st.session_state.website_code.startswith("<!DOCTYPE html>"):
-        st.subheader("웹사이트 미리보기")
-        st.components.v1.html(st.session_state.website_code, height=600, scrolling=True)
-    else:
-        st.error("유효한 HTML 코드가 생성되지 않았습니다.")
-
-if st.button("대화 초기화"):
-    st.session_state.messages = []
-    st.session_state.website_code = ""
-    if 'website_requirements' in st.session_state:
-        del st.session_state.website_requirements
-    st.experimental_rerun()
+            del st.session_state.website_requirements
+        st.experimental_rerun()
+else:
+    st.warning("애플리케이션을 사용하려면 Anthropic API 키를 입력해주세요.")
