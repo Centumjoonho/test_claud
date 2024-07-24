@@ -4,13 +4,12 @@ from anthropic import Anthropic
 import time
 from functools import lru_cache
 import os
-from dotenv import load_dotenv
+
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 환경 변수 로드
-load_dotenv()
+
 
 # Initialize session state
 if 'messages' not in st.session_state:
@@ -19,7 +18,7 @@ if 'website_code' not in st.session_state:
     st.session_state.website_code = ""
 
 def get_api_key():
-    return os.getenv("ANTHROPIC_API_KEY") or st.secrets["ANTHROPIC_API_KEY"]
+     return st.secrets["ANTHROPIC_API_KEY"]
 
 def init_anthropic_client():
     api_key = get_api_key()
