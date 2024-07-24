@@ -1,11 +1,9 @@
 import logging
 import streamlit as st
 from anthropic import Anthropic
-import time
-from functools import lru_cache
 
 # 로깅 설정
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 
 # Initialize session state
 if 'messages' not in st.session_state:
@@ -18,31 +16,21 @@ if 'api_key' not in st.session_state:
 def init_anthropic_client(api_key):
     return Anthropic(api_key=api_key)
 
-@lru_cache(maxsize=100)
 def generate_response(prompt, api_key):
-    """Generate a response using Claude API with retry logic and caching."""
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            client = init_anthropic_client(api_key)
-            message = client.messages.create(
-                model="claude-2.1",
-                max_tokens=2000,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return message.content[0].text
-        except Exception as e:
-            if "overloaded" in str(e).lower() and attempt < max_retries - 1:
-                wait_time = 2 ** attempt  # Exponential backoff
-                logging.warning(f"API 과부하. {wait_time}초 후 재시도합니다.")
-                time.sleep(wait_time)
-            else:
-                logging.error(f"API 호출 중 오류 발생: {str(e)}")
-                st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
-                return None
-    return None
+    """Generate a response using Claude API."""
+    try:
+        client = init_anthropic_client(api_key)
+        message = client.messages.create(
+            model="claude-2.1",
+            max_tokens=2000,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return message.content[0].text
+    except Exception as e:
+        st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
+        return None
 
 def generate_website_code(requirements, api_key):
     """Generate website HTML code based on user requirements."""
@@ -63,7 +51,7 @@ def generate_website_code(requirements, api_key):
     response = generate_response(prompt, api_key)
     
     if response:
-        logging.info(f"API 응답 길이: {len(response)}")
+        logging.info(f"API 응답: {response}")
         html_code = response.strip()
         if "<!DOCTYPE html>" in html_code:
             html_code = html_code[html_code.index("<!DOCTYPE html>"):]
@@ -74,22 +62,24 @@ def generate_website_code(requirements, api_key):
 # Streamlit UI
 st.title("AI 웹사이트 생성기 (Claude 버전)")
 
-# API 키 입력 부분은 그대로 유지
+# API 키 입력
+api_key = st.text_input("Anthropic API 키를 입력해주세요:", type="password")
+if api_key:
+    st.session_state.api_key = api_key
+    try:
+        client = init_anthropic_client(api_key)
+        st.success("API 키가 유효합니다.")
+    except Exception as e:
+        st.error(f"API 키가 유효하지 않습니다: {str(e)}")
+        st.session_state.api_key = ""
 
 if st.session_state.api_key:
-    # 입력 유효성 검사 함수
-    def validate_input(input_text, field_name):
-        if not input_text.strip():
-            st.error(f"{field_name}을(를) 입력해주세요.")
-            return False
-        return True
-
     with st.form("company_info"):
         company_name = st.text_input("회사명을 입력해주세요:")
         industry = st.text_input("업종을 입력해주세요:")
         submit_button = st.form_submit_button("대화 시작하기")
     
-    if submit_button and validate_input(company_name, "회사명") and validate_input(industry, "업종"):
+    if submit_button:
         st.session_state.messages.append({
             "role": "system", 
             "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
@@ -106,19 +96,13 @@ if st.session_state.api_key:
     prompt = st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:")
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.spinner('AI가 응답을 생성 중입니다...'):
-            response = generate_response(prompt, st.session_state.api_key)
+        response = generate_response(prompt, st.session_state.api_key)
         if response:
             st.session_state.messages.append({"role": "assistant", "content": response})
     
     if st.button("웹사이트 생성하기"):
         website_requirements = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
-        with st.spinner('웹사이트를 생성 중입니다...'):
-            progress_bar = st.progress(0)
-            for percent_complete in range(100):
-                time.sleep(0.1)  # 실제 생성 시간에 맞게 조정 필요
-                progress_bar.progress(percent_complete + 1)
-            st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
+        st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
         st.session_state.website_requirements = website_requirements  # 요구사항 저장
     
     # 디버그 정보 및 생성된 코드 표시
