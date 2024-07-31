@@ -16,20 +16,18 @@ if 'api_key' not in st.session_state:
 def init_anthropic_client(api_key):
     return Anthropic(api_key=api_key)
 
-def generate_response(prompt, api_key, context=None):
+def generate_response(prompt, api_key):
     """Generate a response using Claude API."""
     try:
         client = init_anthropic_client(api_key)
-        messages = [{"role": "user", "content": prompt}]
-        if context:
-            messages.insert(0, {"role": "system", "content": context})
-        # UTF-8 인코딩 사용
-        response = client.completions.create(
+        message = client.messages.create(
             model="claude-2.1",
-            prompt=prompt.encode('utf-8'), 
-            max_tokens=2000
+            max_tokens=2000,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
         )
-        return response.choices[0].text
+        return message.content[0].text
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
@@ -61,9 +59,7 @@ def generate_website_code(requirements, api_key):
     
     logging.info(f"프롬프트 내용: {prompt}")
     
-    # 컨텍스트를 포함하여 응답 생성
-    context = "웹사이트 요구사항:\n" + requirements
-    response = generate_response(prompt, api_key, context=context)
+    response = generate_response(prompt, api_key)
     
     if response:
         logging.info(f"API 응답: {response}")
