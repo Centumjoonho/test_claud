@@ -14,10 +14,8 @@ if 'website_code' not in st.session_state:
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
 
-
 def init_anthropic_client(api_key):
     return Anthropic(api_key=api_key)
-
 
 def generate_response_with_artifacts(prompt, api_key):
     """Generate a response using Claude API with artifact support."""
@@ -30,58 +28,61 @@ def generate_response_with_artifacts(prompt, api_key):
                 {"role": "user", "content": prompt}
             ]
         )
-        return message.content
+        if isinstance(message.content, list) and len(message.content) > 0:
+            return message.content[0].text
+        else:
+            logging.error(f"예상치 못한 응답 형식: {message.content}")
+            return None
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
-    
-    
-    
+
 def extract_artifact(response):
     """Extract artifact content from the API response."""
-    artifact_pattern = r'<ANTARTIFACTLINK.*?isClosed="true" />'
-    artifacts = re.findall(artifact_pattern, response)
-    return artifacts
-
-
-
+    if not isinstance(response, str):
+        logging.error(f"응답이 문자열이 아닙니다. 타입: {type(response)}")
+        return None
+    
 def generate_website_code(requirements, api_key):
-  
     """Generate website HTML code based on user requirements."""
     
-    prompt = f"""Human: Create an HTML artifact for a webpage with the following requirements: {requirements}
+    prompt = f"""Human: 다음 요구사항에 맞는 웹페이지의 HTML artifact를 만들어주세요: {requirements}
 
-    Assistant: Certainly! I'll create an HTML artifact for a webpage based on your requirements.
+    Assistant: 네, 말씀하신 요구사항에 맞는 웹페이지의 HTML artifact를 만들어 드리겠습니다.
 
-    <ANTARTIFACTLINK identifier="custom-webpage" type="text/html" title="Custom Webpage" isClosed="true" />
+    <ANTARTIFACTLINK identifier="custom-webpage" type="text/html" title="맞춤 웹페이지" isClosed="true" />
 
-    I've created an HTML artifact for the webpage based on your requirements. The artifact includes a complete HTML structure with appropriate styling and content. You can view and edit this artifact as needed.
+    웹페이지의 HTML artifact를 생성했습니다. 요구사항에 맞는 완전한 HTML 구조와 적절한 스타일, 내용을 포함하고 있습니다. 이 artifact를 필요에 따라 확인하고 수정할 수 있습니다.
 
-    Human: Thank you! Can you show me the HTML code for this webpage?
+    Human: 감사합니다! 이 웹페이지의 HTML 코드를 보여주실 수 있나요?
 
-    Assistant: Of course! Here's the HTML code for the webpage:
+    Assistant: 물론이죠! 다음은 웹페이지의 HTML 코드입니다:
 
-    <ANTARTIFACTLINK identifier="custom-webpage" type="text/html" title="Custom Webpage" isClosed="true" />
+    <ANTARTIFACTLINK identifier="custom-webpage" type="text/html" title="맞춤 웹페이지" isClosed="true" />
 
-    This is a basic structure for the webpage. You can customize it further based on your specific requirements.
+    이것은 웹페이지의 기본 구조입니다. 특정 요구사항에 따라 더 커스터마이즈할 수 있습니다.
 
-    Human: That looks great! Can you explain how to implement this in our current application?"""
+    Human: 좋아 보이네요! 이를 현재 애플리케이션에 어떻게 구현할 수 있는지 설명해 주시겠어요?"""
     
     logging.info(f"프롬프트 내용: {prompt}")
     
     response = generate_response_with_artifacts(prompt, api_key)
     
     if response:
-        logging.info(f"API 응답: {response}")
-        artifacts = extract_artifact(response)
-        if artifacts:
-            # 마지막 artifact를 사용
-            return artifacts[-1]
+        logging.info(f"API 응답 타입: {type(response)}")
+        logging.info(f"API 응답 내용: {response[:500]}...")  # 처음 500자만 로깅
+        html_code = extract_artifact(response)
+        if html_code:
+            return html_code
+        else:
+            logging.error("HTML 코드를 추출할 수 없습니다.")
+    else:
+        logging.error("API 응답이 없습니다.")
     
     return "<!-- 웹사이트 코드를 생성할 수 없습니다 -->"
 
 # Streamlit UI
-st.title("AI 웹사이트 생성기 (Claude 버전)")
+st.title("AI 웹사이트 생성기 (Claude Artifact 버전)")
 
 # API 키 입력
 api_key = st.text_input("Anthropic API 키를 입력해주세요:", type="password")
