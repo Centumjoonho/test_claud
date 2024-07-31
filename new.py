@@ -23,12 +23,13 @@ def generate_response(prompt, api_key, context=None):
         messages = [{"role": "user", "content": prompt}]
         if context:
             messages.insert(0, {"role": "system", "content": context})
-        message = client.messages.create(
+        # UTF-8 인코딩 사용
+        response = client.completions.create(
             model="claude-2.1",
-            max_tokens=2000,
-            messages=messages
+            prompt=prompt.encode('utf-8'), 
+            max_tokens=2000
         )
-        return message.content[0].text
+        return response.choices[0].text
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
