@@ -1,7 +1,6 @@
 import logging
 import streamlit as st
 from anthropic import Anthropic
-import re
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -17,72 +16,89 @@ if 'api_key' not in st.session_state:
 def init_anthropic_client(api_key):
     return Anthropic(api_key=api_key)
 
-def generate_response_with_artifacts(prompt, api_key):
-    """Generate a response using Claude API with artifact support."""
+def create_artifact(client, content):
+    """Create an artifact with the given content."""
+    try:
+        artifact = client.artifacts.create(
+            content=content,
+            type="text"
+        )
+        return artifact
+    except Exception as e:
+        st.error(f"Artifact 생성 중 오류가 발생했습니다: {str(e)}")
+        return None
+
+def generate_response(prompt, api_key, artifact_id=None):
+    """Generate a response using Claude API."""
     try:
         client = init_anthropic_client(api_key)
-        message = client.messages.create(
-            model="claude-3-opus-20240229",  # 최신 모델 사용
-            max_tokens=4000,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-        if isinstance(message.content, list) and len(message.content) > 0:
-            return message.content[0].text
+        if artifact_id:
+            message = client.messages.create(
+                model="claude-2.1",
+                max_tokens=2000,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                artifact_id=artifact_id  # Add the artifact ID here
+            )
         else:
-            logging.error(f"예상치 못한 응답 형식: {message.content}")
-            return None
+            message = client.messages.create(
+                model="claude-2.1",
+                max_tokens=2000,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+        return message.content[0].text
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
-def extract_artifact(response):
-    """Extract artifact content from the API response."""
-    if not isinstance(response, str):
-        logging.error(f"응답이 문자열이 아닙니다. 타입: {type(response)}")
-        return None
-    
 def generate_website_code(requirements, api_key):
     """Generate website HTML code based on user requirements."""
     
-    prompt = f"""Human: 다음 요구사항에 맞는 웹페이지의 HTML artifact를 만들어주세요: {requirements}
+    prompt = f"""당신은 웹 개발자입니다. 
+    
+                다음 요구사항을 바탕으로 완전한 HTML 웹사이트를 만들어주세요: {requirements}
 
-    Assistant: 네, 말씀하신 요구사항에 맞는 웹페이지의 HTML artifact를 만들어 드리겠습니다.
+                반드시 다음 사항을 지켜주세요:
+                
+                1. 응답은 완전한 HTML 구조여야 합니다.
+                <!DOCTYPE html>, <html>, <head>, <body> 태그를 모두 포함해야 합니다.
+                
+                2. <style> 태그 내에 기본적인 CSS를 포함하고, 
+                반응형 디자인을 위한 미디어 쿼리도 추가해주세요.
+                
+                3. 설명이나 주석은 생략하고 순수한 HTML 코드만 제공해 주세요.
+                
+                4. 응답은 반드시 <!DOCTYPE html>로 시작해야 합니다.
+                
+                5. 요구사항에 맞는 실제 콘텐츠를 포함해야 합니다.
+                
+                6. 네비게이션 메뉴, 헤더, 푸터 등 기본적인 웹사이트 구조를 포함해주세요.
 
-    <ANTARTIFACTLINK identifier="custom-webpage" type="text/html" title="맞춤 웹페이지" isClosed="true" />
-
-    웹페이지의 HTML artifact를 생성했습니다. 요구사항에 맞는 완전한 HTML 구조와 적절한 스타일, 내용을 포함하고 있습니다. 이 artifact를 필요에 따라 확인하고 수정할 수 있습니다.
-
-    Human: 감사합니다! 이 웹페이지의 HTML 코드를 보여주실 수 있나요?
-
-    Assistant: 물론이죠! 다음은 웹페이지의 HTML 코드입니다:
-
-    <ANTARTIFACTLINK identifier="custom-webpage" type="text/html" title="맞춤 웹페이지" isClosed="true" />
-
-    이것은 웹페이지의 기본 구조입니다. 특정 요구사항에 따라 더 커스터마이즈할 수 있습니다.
-
-    Human: 좋아 보이네요! 이를 현재 애플리케이션에 어떻게 구현할 수 있는지 설명해 주시겠어요?"""
+                HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다."""
     
     logging.info(f"프롬프트 내용: {prompt}")
     
-    response = generate_response_with_artifacts(prompt, api_key)
+    # Create an artifact with the requirements
+    client = init_anthropic_client(api_key)
+    artifact = create_artifact(client, requirements)
     
-    if response:
-        logging.info(f"API 응답 타입: {type(response)}")
-        logging.info(f"API 응답 내용: {response[:500]}...")  # 처음 500자만 로깅
-        html_code = extract_artifact(response)
-        if html_code:
+    if artifact:
+        response = generate_response(prompt, api_key, artifact_id=artifact.id)
+        
+        if response:
+            logging.info(f"API 응답: {response}")
+            html_code = response.strip()
+            if "<!DOCTYPE html>" in html_code:
+                html_code = html_code[html_code.index("<!DOCTYPE html>"):]
             return html_code
-        else:
-            logging.error("HTML 코드를 추출할 수 없습니다.")
-    else:
-        logging.error("API 응답이 없습니다.")
     
     return "<!-- 웹사이트 코드를 생성할 수 없습니다 -->"
 
 # Streamlit UI
-st.title("AI 웹사이트 생성기 (Claude Artifact 버전)")
+st.title("AI 웹사이트 생성기 (Claude 버전)")
 
 # API 키 입력
 api_key = st.text_input("Anthropic API 키를 입력해주세요:", type="password")
@@ -118,7 +134,7 @@ if st.session_state.api_key:
     prompt = st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:")
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
-        response = generate_response_with_artifacts(prompt, st.session_state.api_key)
+        response = generate_response(prompt, st.session_state.api_key)
         if response:
             st.session_state.messages.append({"role": "assistant", "content": response})
     
@@ -137,10 +153,9 @@ if st.session_state.api_key:
         with st.expander("생성된 HTML 코드 보기", expanded=False):
             st.code(st.session_state.website_code, language="html")
         
-        st.subheader("웹사이트 미리보기")
-        artifact_html = st.session_state.website_code
-        if artifact_html:
-            st.components.v1.html(artifact_html, height=600, scrolling=True)
+        if st.session_state.website_code.startswith("<!DOCTYPE html>"):
+            st.subheader("웹사이트 미리보기")
+            st.components.v1.html(st.session_state.website_code, height=600, scrolling=True)
         else:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
