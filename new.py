@@ -12,6 +12,10 @@ if 'website_code' not in st.session_state:
     st.session_state.website_code = ""
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
+if 'company_name' not in st.session_state:
+    st.session_state.company_name = ""
+if 'industry' not in st.session_state:
+    st.session_state.industry = ""
 
 def init_anthropic_client(api_key):
     return Anthropic(api_key=api_key)
@@ -32,16 +36,20 @@ def generate_response(prompt, api_key):
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
-def generate_website_code(requirements, company_name, industry, api_key):
-    """Generate website HTML code based on user requirements."""
+def generate_website_code(conversation_history, company_name, industry, api_key):
+    """Generate website HTML code based on conversation history."""
     
     prompt = f"""당신은 숙련된 웹 개발자이자 디자이너입니다. 
     
-                다음 요구사항을 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
+                다음 대화 내용을 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
                 
                 회사명: {company_name}
                 업종: {industry}
-                사용자 요구사항: {requirements}
+                대화 내용:
+                {conversation_history}
+
+                이전에 생성된 웹사이트 코드가 있다면, 그것을 기반으로 업데이트하고 개선해주세요.
+                새로운 요구사항이 있다면 그에 맞게 웹사이트를 수정하고 확장해주세요.
 
                 반드시 다음 사항을 지켜주세요:
                 
@@ -117,24 +125,23 @@ if api_key:
         st.session_state.api_key = ""
 
 if st.session_state.api_key:
-    with st.form("company_info"):
-        company_name = st.text_input("회사명을 입력해주세요:")
-        industry = st.text_input("업종을 입력해주세요:")
-        submit_button = st.form_submit_button("대화 시작하기")
-    
-    if submit_button:
-        st.session_state.messages.append({
-            "role": "system", 
-            "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
-        })
+    if not st.session_state.company_name or not st.session_state.industry:
+        with st.form("company_info"):
+            company_name = st.text_input("회사명을 입력해주세요:")
+            industry = st.text_input("업종을 입력해주세요:")
+            submit_button = st.form_submit_button("대화 시작하기")
+        
+        if submit_button:
+            st.session_state.company_name = company_name
+            st.session_state.industry = industry
+            st.session_state.messages.append({
+                "role": "system", 
+                "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
+            })
     
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            if len(message["content"]) > 500:
-                with st.expander("전체 메시지 보기"):
-                    st.markdown(message["content"])
-            else:
-                st.markdown(message["content"])
+            st.markdown(message["content"])
     
     prompt = st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:")
     if prompt:
@@ -142,19 +149,18 @@ if st.session_state.api_key:
         response = generate_response(prompt, st.session_state.api_key)
         if response:
             st.session_state.messages.append({"role": "assistant", "content": response})
-    
-    if st.button("웹사이트 생성하기"):
-        website_requirements = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
-        st.session_state.website_code = generate_website_code(website_requirements, company_name, industry, st.session_state.api_key)
-        st.session_state.website_requirements = website_requirements  # 요구사항 저장
-    
-    # 디버그 정보 및 생성된 코드 표시
-    if 'website_code' in st.session_state and st.session_state.website_code:
-        with st.expander("디버그 정보", expanded=False):
-            if 'website_requirements' in st.session_state:
-                st.write("웹사이트 요구사항:", st.session_state.website_requirements)
-            st.write("생성된 HTML 코드 길이:", len(st.session_state.website_code))
         
+        # 대화 내용을 바탕으로 웹사이트 코드 생성 또는 업데이트
+        conversation_history = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
+        st.session_state.website_code = generate_website_code(
+            conversation_history, 
+            st.session_state.company_name, 
+            st.session_state.industry, 
+            st.session_state.api_key
+        )
+    
+    # 생성된 코드 표시
+    if st.session_state.website_code:
         with st.expander("생성된 HTML 코드 보기", expanded=False):
             st.code(st.session_state.website_code, language="html")
         
