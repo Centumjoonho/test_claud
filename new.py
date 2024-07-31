@@ -24,7 +24,7 @@ def generate_response(prompt, api_key):
             model="claude-2.1",
             max_tokens=2000,
             messages=[
-                 {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt.encode('utf-8').decode('utf-8')}
             ]
         )
         return message.content[0].text
@@ -57,7 +57,7 @@ def generate_website_code(requirements, api_key):
 
                 HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다.
                 
-            중요: 반드시 전체 HTML 코드를 <ANTARTIFACTLINK> 태그로 감싸서 제공해야 합니다. 
+                중요: 반드시 전체 HTML 코드를 <ANTARTIFACTLINK> 태그로 감싸서 제공해야 합니다. 
             예시:
             <ANTARTIFACTLINK identifier="generated-website" type="text/html" title="생성된 웹사이트">
             <!DOCTYPE html>
@@ -75,13 +75,16 @@ def generate_website_code(requirements, api_key):
     response = generate_response(prompt, api_key)
     
     if response:
-        logging.info(f"API 응답 전체 내용: {response}")  # 전체 응답 로깅
+        logging.info(f"API 응답 길이: {len(response)}")
         if isinstance(response, str):
-            if "<ANTARTIFACTLINK" in response:
-                return response
+            artifact_start = response.find("<ANTARTIFACTLINK")
+            artifact_end = response.find("</ANTARTIFACTLINK>")
+            
+            if artifact_start != -1 and artifact_end != -1:
+                html_code = response[artifact_start:artifact_end + len("</ANTARTIFACTLINK>")]
+                return html_code
             else:
-                # 태그가 없는 경우, 전체 응답을 HTML로 간주하고 태그로 감싸기
-                return f'<ANTARTIFACTLINK identifier="generated-website" type="text/html" title="생성된 웹사이트">{response}</ANTARTIFACTLINK>'
+                logging.error("API 응답에서 <ANTARTIFACTLINK> 태그를 찾을 수 없습니다.")
         else:
             logging.error(f"예상치 못한 응답 형식: {type(response)}")
 
