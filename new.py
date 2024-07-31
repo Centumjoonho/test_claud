@@ -16,39 +16,18 @@ if 'api_key' not in st.session_state:
 def init_anthropic_client(api_key):
     return Anthropic(api_key=api_key)
 
-def create_artifact(client, content):
-    """Create an artifact with the given content."""
-    try:
-        artifact = client.artifacts.create(
-            content=content,
-            type="text"
-        )
-        return artifact
-    except Exception as e:
-        st.error(f"Artifact 생성 중 오류가 발생했습니다: {str(e)}")
-        return None
-
-def generate_response(prompt, api_key, artifact_id=None):
+def generate_response(prompt, api_key, context=None):
     """Generate a response using Claude API."""
     try:
         client = init_anthropic_client(api_key)
-        if artifact_id:
-            message = client.messages.create(
-                model="claude-2.1",
-                max_tokens=2000,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                artifact_id=artifact_id  # Add the artifact ID here
-            )
-        else:
-            message = client.messages.create(
-                model="claude-2.1",
-                max_tokens=2000,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
+        messages = [{"role": "user", "content": prompt}]
+        if context:
+            messages.insert(0, {"role": "system", "content": context})
+        message = client.messages.create(
+            model="claude-2.1",
+            max_tokens=2000,
+            messages=messages
+        )
         return message.content[0].text
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
@@ -81,19 +60,16 @@ def generate_website_code(requirements, api_key):
     
     logging.info(f"프롬프트 내용: {prompt}")
     
-    # Create an artifact with the requirements
-    client = init_anthropic_client(api_key)
-    artifact = create_artifact(client, requirements)
+    # 컨텍스트를 포함하여 응답 생성
+    context = "웹사이트 요구사항:\n" + requirements
+    response = generate_response(prompt, api_key, context=context)
     
-    if artifact:
-        response = generate_response(prompt, api_key, artifact_id=artifact.id)
-        
-        if response:
-            logging.info(f"API 응답: {response}")
-            html_code = response.strip()
-            if "<!DOCTYPE html>" in html_code:
-                html_code = html_code[html_code.index("<!DOCTYPE html>"):]
-            return html_code
+    if response:
+        logging.info(f"API 응답: {response}")
+        html_code = response.strip()
+        if "<!DOCTYPE html>" in html_code:
+            html_code = html_code[html_code.index("<!DOCTYPE html>"):]
+        return html_code
     
     return "<!-- 웹사이트 코드를 생성할 수 없습니다 -->"
 
