@@ -24,7 +24,7 @@ def generate_response(prompt, api_key):
             model="claude-2.1",
             max_tokens=4000,
             messages=[
-                {"role": "user", "content": prompt.encode('utf-8').decode('utf-8')}
+                {"role": "user", "content": prompt}
             ]
         )
         return message.content[0].text
@@ -170,10 +170,6 @@ if st.session_state.api_key:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
     if st.button("대화 초기화"):
-        st.session_state.messages = []
-        st.session_state.website_code = ""
-        if 'website_requirements' in st.session_state:
-            del st.session_state.website_requirements
-        st.experimental_rerun()
-else:
-    st.warning("애플리케이션을 사용하려면 Anthropic API 키를 입력해주세요.")
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
