@@ -24,7 +24,7 @@ def generate_response(prompt, api_key):
             model="claude-2.1",
             max_tokens=2000,
             messages=[
-                {"role": "user", "content": prompt.encode('utf-8').decode('utf-8')}
+                 {"role": "user", "content": prompt}
             ]
         )
         return message.content[0].text
