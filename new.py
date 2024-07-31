@@ -62,13 +62,20 @@ def generate_website_code(requirements, api_key):
     response = generate_response(prompt, api_key)
     
     if response:
-        logging.info(f"API 응답: {response}")
-        html_code = response.strip()
-        if "<!DOCTYPE html>" in html_code:
-            html_code = html_code[html_code.index("<!DOCTYPE html>"):]
-        return html_code
-    
-    return "<!-- 웹사이트 코드를 생성할 수 없습니다 -->"
+        logging.info(f"API 응답 길이: {len(response)}")
+        if isinstance(response, str):
+            artifact_start = response.find("<ANTARTIFACTLINK")
+            artifact_end = response.find("</ANTARTIFACTLINK>")
+            
+            if artifact_start != -1 and artifact_end != -1:
+                html_code = response[artifact_start:artifact_end + len("</ANTARTIFACTLINK>")]
+                return html_code
+            else:
+                logging.error("API 응답에서 <ANTARTIFACTLINK> 태그를 찾을 수 없습니다.")
+        else:
+            logging.error(f"예상치 못한 응답 형식: {type(response)}")
+
+    return '<ANTARTIFACTLINK identifier="generated-website" type="text/html" title="생성된 웹사이트"><!-- 웹사이트 코드를 생성할 수 없습니다 --></ANTARTIFACTLINK>'
 
 # Streamlit UI
 st.title("AI 웹사이트 생성기 (Claude 버전)")
@@ -116,6 +123,7 @@ if st.session_state.api_key:
         st.session_state.website_code = generate_website_code(website_requirements, st.session_state.api_key)
         st.session_state.website_requirements = website_requirements  # 요구사항 저장
     
+    
     # 디버그 정보 및 생성된 코드 표시
     if 'website_code' in st.session_state and st.session_state.website_code:
         with st.expander("디버그 정보", expanded=False):
@@ -126,9 +134,14 @@ if st.session_state.api_key:
         with st.expander("생성된 HTML 코드 보기", expanded=False):
             st.code(st.session_state.website_code, language="html")
         
-        if st.session_state.website_code.startswith("<!DOCTYPE html>"):
+        # ANTARTIFACTLINK 태그에서 HTML 코드 추출
+        html_start = st.session_state.website_code.find(">") + 1
+        html_end = st.session_state.website_code.rfind("</ANTARTIFACTLINK")
+        html_code = st.session_state.website_code[html_start:html_end].strip()
+        
+        if html_code.startswith("<!DOCTYPE html>"):
             st.subheader("웹사이트 미리보기")
-            st.components.v1.html(st.session_state.website_code, height=600, scrolling=True)
+            st.components.v1.html(html_code, height=600, scrolling=True)
         else:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
