@@ -1,6 +1,7 @@
 import logging
 import streamlit as st
 from openai import OpenAI
+import re
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -85,9 +86,23 @@ def generate_website_code(conversation_history, company_name, industry, api_key)
     
     if response:
         logging.info(f"API 응답 길이: {len(response)}")
-        return response
+        return clean_html(response)
     
     return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
+
+def clean_html(html):
+    """Clean and validate HTML code."""
+    # Remove any non-HTML content before <!DOCTYPE html>
+    html = re.sub(r'^.*?<!DOCTYPE html>', '<!DOCTYPE html>', html, flags=re.DOTALL)
+    
+    # Remove any content after closing </html> tag
+    html = re.sub(r'</html>.*$', '</html>', html, flags=re.DOTALL)
+    
+    # Ensure the HTML structure is complete
+    if not html.strip().startswith('<!DOCTYPE html>') or not html.strip().endswith('</html>'):
+        return None
+    
+    return html
 
 # Streamlit UI
 st.title("AI 웹사이트 생성기 (OpenAI 버전)")
