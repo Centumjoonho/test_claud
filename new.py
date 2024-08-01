@@ -2,6 +2,7 @@ import logging
 import streamlit as st
 from openai import OpenAI
 import html
+import tiktoken
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -26,13 +27,20 @@ def generate_response(prompt, api_key):
     """Generate a response using OpenAI API."""
     try:
         client = init_openai_client(api_key)
+        prompt_tokens = count_tokens(prompt)
+        available_tokens = 8192 - prompt_tokens - 100  # 100 토큰의 여유를 둡니다
+        completion_tokens = min(available_tokens, max_tokens)
+        
+        if completion_tokens <= 0:
+            raise ValueError("프롬프트가 너무 깁니다. 대화 내용을 줄여주세요.")
+        
         response = client.chat.completions.create(
             model="gpt-4",  # 또는 원하는 모델
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=10000
+            max_tokens=completion_tokens
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -42,43 +50,30 @@ def generate_response(prompt, api_key):
 def generate_website_code(conversation_history, company_name, industry, api_key):
     """Generate website HTML code based on conversation history."""
     
-    prompt = f"""당신은 숙련된 웹 개발자이자 디자이너입니다. 
+     # 대화 내용 요약 또는 최근 N개의 메시지만 사용
+    recent_messages = conversation_history.split("\n")[-5:]  # 최근 5개의 메시지만 사용
+    summarized_history = "\n".join(recent_messages)
     
-                다음 대화 내용을 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
+    prompt = f"""당신은 숙련된 웹 개발자이자 디자이너입니다. 
+                다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
                 
                 회사명: {company_name}
                 업종: {industry}
-                대화 내용:
-                {conversation_history}
+                최근 대화 내용:
+                {summarized_history}
 
-                이전에 생성된 웹사이트 코드가 있다면, 그것을 기반으로 업데이트하고 개선해주세요.
-                새로운 요구사항이 있다면 그에 맞게 웹사이트를 수정하고 확장해주세요.
+                요구사항:
+                1. HTML5 구조 (<!DOCTYPE html>, <html>, <head>, <body>)
+                2. 반응형 디자인 (Flexbox/Grid, 미디어 쿼리)
+                3. 모던한 디자인 (그라데이션, 그림자, 애니메이션)
+                4. 기본 구조 (헤더, 네비게이션, 메인 콘텐츠, 푸터)
+                5. 업종에 맞는 색상
+                6. Font Awesome 아이콘 사용
+                7. 간단한 JavaScript로 동적 요소 추가
+                8. SEO 메타태그와 오픈 그래프 태그
+                9. 웹 접근성 준수
 
-                반드시 다음 사항을 지켜주세요:
-                
-                1. 응답은 완전한 HTML5 구조여야 합니다. <!DOCTYPE html>, <html>, <head>, <body> 태그를 모두 포함해야 합니다.
-                
-                2. <style> 태그 내에 최신 CSS 기술을 활용한 스타일을 포함하세요. Flexbox나 Grid를 사용하여 레이아웃을 구성하고,
-                   반응형 디자인을 위한 미디어 쿼리를 반드시 추가해주세요.
-                
-                3. 모던한 디자인 트렌드를 반영하여 시각적으로 매력적인 웹사이트를 만들어주세요.
-                   (예: 그라데이션, 그림자 효과, 부드러운 애니메이션 등)
-                
-                4. 헤더, 네비게이션 메뉴, 메인 콘텐츠 영역, 사이드바(필요시), 푸터 등 기본적인 웹사이트 구조를 포함해주세요.
-                
-                5. 회사의 특성과 업종을 고려한 적절한 색상 스키마를 사용하세요.
-                
-                6. Font Awesome 아이콘을 활용하여 시각적 요소를 추가하세요. (CDN 링크: https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css)
-                
-                7. 간단한 JavaScript를 사용하여 동적 요소를 추가하세요. (예: 스크롤 애니메이션, 모달 팝업 등)
-                
-                8. 요구사항에 맞는 실제 콘텐츠를 포함하되, 필요한 경우 적절한 더미 텍스트로 채워넣으세요.
-                
-                9. SEO를 위한 메타 태그와 오픈 그래프 태그를 포함하세요.
-                
-                10. 웹 접근성 가이드라인을 준수하여 모든 사용자가 이용할 수 있는 웹사이트를 만들어주세요.
-
-                HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다.
+                HTML 코드만 제공해 주세요.
                 """
     
     logging.info(f"프롬프트 내용: {prompt}")
