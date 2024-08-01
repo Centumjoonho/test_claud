@@ -1,9 +1,11 @@
 import logging
 import streamlit as st
 from openai import OpenAI
+import html
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
+st.set_page_config(layout="wide")
 
 # Initialize session state
 if 'messages' not in st.session_state:
@@ -30,7 +32,7 @@ def generate_response(prompt, api_key):
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=4000
+            max_tokens=10000
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -138,17 +140,33 @@ if st.session_state.api_key:
             st.session_state.api_key
         )
     
+    
     # 생성된 코드 표시
     if st.session_state.website_code:
-        with st.expander("생성된 HTML 코드 보기", expanded=False):
-            st.code(st.session_state.website_code, language="html")
+        col1, col2 = st.columns([1, 3])  # 1:3 비율로 컬럼 분할
         
-        if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
-            st.subheader("웹사이트 미리보기")
-            st.components.v1.html(st.session_state.website_code, height=800, scrolling=True)
-        else:
-            st.error("유효한 HTML 코드가 생성되지 않았습니다.")
+        with col1:
+            with st.expander("생성된 HTML 코드 보기", expanded=False):
+                st.code(st.session_state.website_code, language="html")
 
+        with col2:
+            html_code = st.session_state.website_code.strip()
+            if html_code.startswith("<!DOCTYPE html>") or html_code.lower().startswith("<html"):
+                st.subheader("웹사이트 미리보기")
+                # 안전한 HTML 렌더링을 위해 html.escape 사용
+                safe_html = html.escape(html_code)
+                st.components.v1.html(safe_html, height=1000, scrolling=True)  # 높이를 1000px로 증가
+            else:
+                st.error("유효한 HTML 코드가 생성되지 않았습니다.")
+                st.text("생성된 코드 (처음 500자):")
+                st.text(html_code[:500] + ("..." if len(html_code) > 500 else ""))
+
+        # HTML 구조 분석
+        if "<body>" in html_code.lower() and "</body>" in html_code.lower():
+            st.success("HTML 구조가 올바르게 생성되었습니다.")
+        else:
+            st.warning("HTML 구조가 완전하지 않을 수 있습니다. <body> 태그를 확인해주세요.")
+            
     if st.button("대화 초기화"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
