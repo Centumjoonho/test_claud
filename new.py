@@ -148,7 +148,7 @@ if st.session_state.api_key:
     
     # 생성된 코드 표시
     if st.session_state.website_code:
-        col1, col2 = st.columns([1, 3])  # 1:3 비율로 컬럼 분할
+        col1, col2 = st.columns([2, 2])  # 1:3 비율로 컬럼 분할
         
         with col1:
             with st.expander("생성된 HTML 코드 보기", expanded=False):
