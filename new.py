@@ -2,8 +2,6 @@ import logging
 import streamlit as st
 from openai import OpenAI
 import tiktoken
-
-# Streamlit components를 명시적으로 임포트
 from streamlit.components.v1 import html as st_html
 
 # 로깅 설정
@@ -28,17 +26,16 @@ def count_tokens(text):
         return len(encoding.encode(text))
     except Exception as e:
         logging.error(f"토큰 계산 중 오류 발생: {str(e)}")
-        return 0  # 오류 발생 시 0을 반환
+        return 0
 
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
 
 def generate_response(prompt, api_key, max_tokens=4000):
-    """Generate a response using OpenAI API with token limit consideration."""
     try:
         client = init_openai_client(api_key)
         prompt_tokens = count_tokens(prompt)
-        available_tokens = 8192 - prompt_tokens - 100  # 100 토큰의 여유를 둡니다
+        available_tokens = 8192 - prompt_tokens - 100
         completion_tokens = min(available_tokens, max_tokens)
         
         if completion_tokens <= 0:
@@ -47,55 +44,49 @@ def generate_response(prompt, api_key, max_tokens=4000):
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "You are a skilled web developer and designer. Provide only HTML code in your response."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=completion_tokens
         )
         return response.choices[0].message.content
     except Exception as e:
-        logging.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
-        st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
+        logging.error(f"API 호출 중 오류 발생: {str(e)}")
         return None
 
 def generate_website_code(conversation_history, company_name, industry, api_key):
-    """Generate website HTML code based on conversation history."""
-    
-    # 대화 내용 요약 또는 최근 N개의 메시지만 사용
-    recent_messages = conversation_history.split("\n")[-5:]  # 최근 5개의 메시지만 사용
+    recent_messages = conversation_history.split("\n")[-5:]
     summarized_history = "\n".join(recent_messages)
     
-    prompt = f"""당신은 숙련된 웹 개발자이자 디자이너입니다. 
-                다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
-                
-                회사명: {company_name}
-                업종: {industry}
-                최근 대화 내용:
-                {summarized_history}
+    prompt = f"""Create a modern, professional HTML website for:
+                Company: {company_name}
+                Industry: {industry}
+                Recent conversation: {summarized_history}
 
-                요구사항:
-                1. HTML5 구조 (<!DOCTYPE html>, <html>, <head>, <body>)
-                2. 반응형 디자인 (Flexbox/Grid, 미디어 쿼리)
-                3. 모던한 디자인 (그라데이션, 그림자, 애니메이션)
-                4. 기본 구조 (헤더, 네비게이션, 메인 콘텐츠, 푸터)
-                5. 업종에 맞는 색상
-                6. Font Awesome 아이콘 사용
-                7. 간단한 JavaScript로 동적 요소 추가
-                8. SEO 메타태그와 오픈 그래프 태그
-                9. 웹 접근성 준수
+                Requirements:
+                1. Full HTML5 structure (<!DOCTYPE html>, <html>, <head>, <body>)
+                2. Responsive design (Flexbox/Grid, media queries)
+                3. Modern design (gradients, shadows, animations)
+                4. Basic structure (header, navigation, main content, footer)
+                5. Industry-appropriate color scheme
+                6. Font Awesome icons (use CDN)
+                7. Simple JavaScript for dynamic elements
+                8. SEO meta tags and Open Graph tags
+                9. Web accessibility compliance
 
-                HTML 코드만 제공해 주세요.
+                Provide only the complete HTML code.
                 """
     
-    logging.info(f"프롬프트 내용: {prompt}")
-    
+    logging.info(f"Generating website code with prompt length: {len(prompt)}")
     response = generate_response(prompt, api_key)
     
     if response:
-        logging.info(f"API 응답 길이: {len(response)}")
+        logging.info(f"Generated HTML code length: {len(response)}")
         return response
-    
-    return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
+    return None
+
+def is_valid_html(html_code):
+    return (html_code.strip().startswith("<!DOCTYPE html>") or html_code.strip().lower().startswith("<html")) and "<body>" in html_code.lower() and "</body>" in html_code.lower()
 
 # Streamlit UI
 st.title("AI 웹사이트 생성기 (OpenAI 버전)")
@@ -105,7 +96,7 @@ api_key = st.text_input("OpenAI API 키를 입력해주세요:", type="password"
 if api_key:
     st.session_state.api_key = api_key
     try:
-        client = init_openai_client(api_key)
+        init_openai_client(api_key)
         st.success("API 키가 유효합니다.")
     except Exception as e:
         st.error(f"API 키가 유효하지 않습니다: {str(e)}")
@@ -118,13 +109,14 @@ if st.session_state.api_key:
             industry = st.text_input("업종을 입력해주세요:")
             submit_button = st.form_submit_button("대화 시작하기")
         
-        if submit_button:
+        if submit_button and company_name and industry:
             st.session_state.company_name = company_name
             st.session_state.industry = industry
             st.session_state.messages.append({
                 "role": "system", 
                 "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
             })
+            st.rerun()
     
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -137,40 +129,35 @@ if st.session_state.api_key:
         if response:
             st.session_state.messages.append({"role": "assistant", "content": response})
         
-        # 대화 내용을 바탕으로 웹사이트 코드 생성 또는 업데이트
         conversation_history = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
-        st.session_state.website_code = generate_website_code(
+        website_code = generate_website_code(
             conversation_history, 
             st.session_state.company_name, 
             st.session_state.industry, 
             st.session_state.api_key
         )
+        
+        if website_code:
+            st.session_state.website_code = website_code
+            st.rerun()
     
-    # 생성된 코드 표시
     if st.session_state.website_code:
-        col1, col2 = st.columns([2, 2])  # 1:3 비율로 컬럼 분할
+        col1, col2 = st.columns([1, 1])
         
         with col1:
-            with st.expander("생성된 HTML 코드 보기", expanded=False):
-                st.code(st.session_state.website_code, language="html")
+            st.subheader("생성된 HTML 코드")
+            st.code(st.session_state.website_code, language="html")
 
         with col2:
-            html_code = st.session_state.website_code.strip()
-            if html_code.startswith("<!DOCTYPE html>") or html_code.lower().startswith("<html"):
-                st.subheader("웹사이트 미리보기")
-                # HTML을 직접 렌더링
-                st_html(html_code, height=1000, scrolling=True)
+            st.subheader("웹사이트 미리보기")
+            if is_valid_html(st.session_state.website_code):
+                st_html(st.session_state.website_code, height=600, scrolling=True)
+                st.success("HTML 코드가 성공적으로 생성되었습니다.")
             else:
                 st.error("유효한 HTML 코드가 생성되지 않았습니다.")
-                st.text("생성된 코드 (처음 500자):")
-                st.text(html_code[:500] + ("..." if len(html_code) > 500 else ""))
+                st.text("생성된 코드의 시작 부분:")
+                st.code(st.session_state.website_code[:500], language="html")
 
-        # HTML 구조 분석
-        if "<body>" in html_code.lower() and "</body>" in html_code.lower():
-            st.success("HTML 구조가 올바르게 생성되었습니다.")
-        else:
-            st.warning("HTML 구조가 완전하지 않을 수 있습니다. <body> 태그를 확인해주세요.")
-            
     if st.button("대화 초기화"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
