@@ -43,75 +43,12 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     """Generate website HTML code based on conversation history."""
     
     prompt = f"""당신은 숙련된 웹 개발자이자 디자이너입니다. 
-    다음 정보와 템플릿을 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
+    다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
 
     회사명: {company_name}
     업종: {industry}
     주 색상: {primary_color}
-    대화 내용: {conversation_history} 
-    다음은 참고해야 할 웹사이트 템플릿 구조입니다:
-
-    1. DOCTYPE 선언과 HTML 구조:
-       <!DOCTYPE HTML>
-       <HTML class="Userpage" lang="ko" dir="ltr">
-
-    2. 헤드 섹션:
-       <head>
-           <meta charset="UTF-8">
-           <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-           <title>{company_name}</title>
-           <!-- SEO 메타 태그 -->
-           <!-- CSS 및 JS 파일 링크 -->
-       </head>
-
-    3. 바디 구조:
-       <body>
-           <div id="skipNavi">
-               <!-- 접근성을 위한 스킵 네비게이션 -->
-           </div>
-           <div id="fullpage">
-               <div class="wrapper">
-                   <!-- 헤더 섹션 -->
-                   <div class="header_wrap" id="header">
-                       <!-- 로고, 네비게이션 메뉴 등 -->
-                   </div>
-                   
-                   <!-- 메인 비주얼 섹션 -->
-                   <div class="visual section">
-                       <!-- 메인 비주얼 내용 -->
-                   </div>
-                   
-                   <!-- 사업 분야 섹션 -->
-                   <div class="section business_bg">
-                       <!-- 사업 분야 소개 -->
-                   </div>
-                   
-                   <!-- 회사 소개 섹션 -->
-                   <div class="section section4">
-                       <!-- 회사 소개 내용 -->
-                   </div>
-                   
-                   <!-- 추가 정보 섹션 -->
-                   <div class="section fp-auto-height section5">
-                       <!-- 오시는 길, 고객사 정보 등 -->
-                   </div>
-                   
-                   <!-- 문의 섹션 -->
-                   <div class="section fp-auto-height">
-                       <!-- 문의 및 브로슈어 다운로드 -->
-                   </div>
-                   
-                   <!-- 푸터 섹션 -->
-                   <div class="section fp-auto-height">
-                       <div class="footer" id="footer">
-                           <!-- 푸터 내용 -->
-                       </div>
-                   </div>
-               </div>
-           </div>
-       </body>
-
-    이 구조를 기반으로, 다음 사항을 준수하여 웹사이트를 생성해주세요:
+    대화 내용: {conversation_history}
 
     이전에 생성된 웹사이트 코드가 있다면, 그것을 기반으로 업데이트하고 개선해주세요.
     새로운 요구사항이 있다면 그에 맞게 웹사이트를 수정하고 확장해주세요.
@@ -252,7 +189,7 @@ if st.session_state.api_key:
         
         if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
             st.subheader("웹사이트 미리보기")
-            st.components.v1.html(st.session_state.website_code, height=800, scrolling=True, width=None)
+            st.components.v1.html(st.session_state.website_code, height=800, scrolling=True)
         else:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
