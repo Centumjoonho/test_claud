@@ -1,8 +1,10 @@
 import logging
 import streamlit as st
 from openai import OpenAI
-import html
 import tiktoken
+
+# Streamlit components를 명시적으로 임포트
+from streamlit.components.v1 import html as st_html
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -156,9 +158,8 @@ if st.session_state.api_key:
             html_code = st.session_state.website_code.strip()
             if html_code.startswith("<!DOCTYPE html>") or html_code.lower().startswith("<html"):
                 st.subheader("웹사이트 미리보기")
-                # 안전한 HTML 렌더링을 위해 html.escape 사용
-                safe_html = html.escape(html_code)
-                st.components.v1.html(safe_html, height=1000, scrolling=True)  # 높이를 1000px로 증가
+                # HTML을 직접 렌더링
+                st_html(html_code, height=1000, scrolling=True)
             else:
                 st.error("유효한 HTML 코드가 생성되지 않았습니다.")
                 st.text("생성된 코드 (처음 500자):")
