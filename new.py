@@ -150,7 +150,6 @@ if st.session_state.api_key:
     # 현재 설정된 정보 표시
     st.sidebar.write(f"회사명: {st.session_state.get('company_name', '미설정')}")
     st.sidebar.write(f"업종: {st.session_state.get('industry', '미설정')}")
-    st.sidebar.write(f"주 색상: {st.session_state.get('primary_color', '미설정')}")
 
     # 색상 변경 옵션
     new_color = st.sidebar.color_picker("주 색상 변경", st.session_state.get('primary_color', '#000000'))
