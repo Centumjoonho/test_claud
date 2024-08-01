@@ -1,6 +1,6 @@
 import logging
 import streamlit as st
-from openai import OpenAI
+from anthropic import Anthropic
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -10,29 +10,28 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 if 'website_code' not in st.session_state:
     st.session_state.website_code = ""
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = ""
 if 'company_name' not in st.session_state:
     st.session_state.company_name = ""
 if 'industry' not in st.session_state:
     st.session_state.industry = ""
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = ""
 
-def init_openai_client(api_key):
-    return OpenAI(api_key=api_key)
+def init_anthropic_client(api_key):
+    return Anthropic(api_key=api_key)
 
 def generate_response(prompt, api_key):
-    """Generate a response using OpenAI API."""
+    """Generate a response using Claude API."""
     try:
-        client = init_openai_client(api_key)
-        response = client.chat.completions.create(
-            model="gpt-4",  # 또는 원하는 모델
+        client = init_anthropic_client(api_key)
+        message = client.messages.create(
+            model="claude-2.1",
+            max_tokens=4000,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
-            ],
-            max_tokens=4000
+            ]
         )
-        return response.choices[0].message.content
+        return message.content[0].text
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
@@ -77,6 +76,18 @@ def generate_website_code(conversation_history, company_name, industry, api_key)
                 10. 웹 접근성 가이드라인을 준수하여 모든 사용자가 이용할 수 있는 웹사이트를 만들어주세요.
 
                 HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다.
+                
+                중요: 반드시 전체 HTML 코드를 <ANTARTIFACTLINK> 태그로 감싸서 제공해야 합니다. 
+                
+                예시:
+                <ANTARTIFACTLINK identifier="generated-website" type="text/html" title="생성된 웹사이트">
+                <!DOCTYPE html>
+                <html>
+                ...
+                </html>
+                </ANTARTIFACTLINK>
+
+                오직 <ANTARTIFACTLINK> 태그로 감싼 HTML 코드만 제공하세요.
                 """
     
     logging.info(f"프롬프트 내용: {prompt}")
@@ -85,19 +96,29 @@ def generate_website_code(conversation_history, company_name, industry, api_key)
     
     if response:
         logging.info(f"API 응답 길이: {len(response)}")
-        return response
-    
-    return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
+        if isinstance(response, str):
+            artifact_start = response.find("<ANTARTIFACTLINK")
+            artifact_end = response.find("</ANTARTIFACTLINK>")
+            
+            if artifact_start != -1 and artifact_end != -1:
+                html_code = response[artifact_start:artifact_end + len("</ANTARTIFACTLINK>")]
+                return html_code
+            else:
+                logging.error("API 응답에서 <ANTARTIFACTLINK> 태그를 찾을 수 없습니다.")
+        else:
+            logging.error(f"예상치 못한 응답 형식: {type(response)}")
+
+    return '<ANTARTIFACTLINK identifier="generated-website" type="text/html" title="생성된 웹사이트"><!-- 웹사이트 코드를 생성할 수 없습니다 --></ANTARTIFACTLINK>'
 
 # Streamlit UI
-st.title("AI 웹사이트 생성기 (OpenAI 버전)")
+st.title("AI 웹사이트 생성기 (Claude 버전)")
 
 # API 키 입력
-api_key = st.text_input("OpenAI API 키를 입력해주세요:", type="password", value=st.session_state.api_key)
+api_key = st.text_input("Anthropic API 키를 입력해주세요:", type="password")
 if api_key:
     st.session_state.api_key = api_key
     try:
-        client = init_openai_client(api_key)
+        client = init_anthropic_client(api_key)
         st.success("API 키가 유효합니다.")
     except Exception as e:
         st.error(f"API 키가 유효하지 않습니다: {str(e)}")
@@ -143,9 +164,14 @@ if st.session_state.api_key:
         with st.expander("생성된 HTML 코드 보기", expanded=False):
             st.code(st.session_state.website_code, language="html")
         
-        if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
+        # ANTARTIFACTLINK 태그에서 HTML 코드 추출
+        html_start = st.session_state.website_code.find(">") + 1
+        html_end = st.session_state.website_code.rfind("</ANTARTIFACTLINK")
+        html_code = st.session_state.website_code[html_start:html_end].strip()
+        
+        if html_code.startswith("<!DOCTYPE html>"):
             st.subheader("웹사이트 미리보기")
-            st.components.v1.html(st.session_state.website_code, height=800, scrolling=True)
+            st.components.v1.html(html_code, height=800, scrolling=True)
         else:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
