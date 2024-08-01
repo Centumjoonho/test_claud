@@ -3,6 +3,7 @@ import streamlit as st
 from openai import OpenAI
 import re
 
+
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 
@@ -105,6 +106,7 @@ def clean_html(html):
     return html
 
 # Streamlit UI
+st.set_page_config(layout="wide")
 st.title("AI 웹사이트 생성기 (OpenAI 버전)")
 
 # API 키 입력
