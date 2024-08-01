@@ -20,11 +20,19 @@ if 'industry' not in st.session_state:
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
 
+def count_tokens(text):
+    try:
+        encoding = tiktoken.encoding_for_model("gpt-4")
+        return len(encoding.encode(text))
+    except Exception as e:
+        logging.error(f"토큰 계산 중 오류 발생: {str(e)}")
+        return 0  # 오류 발생 시 0을 반환
+
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
 
-def generate_response(prompt, api_key):
-    """Generate a response using OpenAI API."""
+def generate_response(prompt, api_key, max_tokens=4000):
+    """Generate a response using OpenAI API with token limit consideration."""
     try:
         client = init_openai_client(api_key)
         prompt_tokens = count_tokens(prompt)
@@ -35,7 +43,7 @@ def generate_response(prompt, api_key):
             raise ValueError("프롬프트가 너무 깁니다. 대화 내용을 줄여주세요.")
         
         response = client.chat.completions.create(
-            model="gpt-4",  # 또는 원하는 모델
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
@@ -44,13 +52,14 @@ def generate_response(prompt, api_key):
         )
         return response.choices[0].message.content
     except Exception as e:
+        logging.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
 def generate_website_code(conversation_history, company_name, industry, api_key):
     """Generate website HTML code based on conversation history."""
     
-     # 대화 내용 요약 또는 최근 N개의 메시지만 사용
+    # 대화 내용 요약 또는 최근 N개의 메시지만 사용
     recent_messages = conversation_history.split("\n")[-5:]  # 최근 5개의 메시지만 사용
     summarized_history = "\n".join(recent_messages)
     
@@ -134,7 +143,6 @@ if st.session_state.api_key:
             st.session_state.industry, 
             st.session_state.api_key
         )
-    
     
     # 생성된 코드 표시
     if st.session_state.website_code:
