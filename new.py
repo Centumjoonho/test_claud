@@ -28,7 +28,7 @@ def generate_response(prompt, api_key):
         client = init_openai_client(api_key)
         
       
-        max_tokens = 9384 
+        max_tokens = 10384 
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -65,10 +65,10 @@ def generate_website_code(conversation_history, company_name, industry, primary_
             g. 푸터: 회사 정보, 빠른 링크, 소셜 미디어 아이콘
 
             2. 이미지 및 콘텐츠:
-            a. 모든 이미지에 실제 Unsplash URL을 사용하세요. 예: https://images.unsplash.com/photo-xxxx
+            a. 모든 이미지에 실제 Unsplash URL을 사용하세요. 예: https://images.unsplash.com/photo-1531403009284-440f080d1e12?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80
             b. 각 이미지에 적절한 alt 텍스트를 제공하세요.
             c. 히어로 섹션:
-                - 배경: {industry}를 대표하는 고품질 이미지 사용
+                - 배경: {industry}를 대표하는 실제 Unsplash URL을 사용하세요 예 : url("https://images.unsplash.com/photo-1498050108023-c5249f4df085?ixlib=rb-1.2.1&auto=format&fit=crop&w=1352&q=80")
                 - 슬로건: "{company_name} - {industry}의 혁신적인 솔루션"
                 - 1-2문장의 간단한 회사 소개 포함
             d. 제품/서비스 카드:
