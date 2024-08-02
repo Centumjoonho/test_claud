@@ -24,49 +24,60 @@ if 'primary_color' not in st.session_state:
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
 
+def get_token_limit(model):
+    model_token_limits = {
+        "gpt-3.5-turbo": 4096,
+        "gpt-3.5-turbo-16k": 16384,
+        "gpt-4": 8192,
+        "gpt-4-32k": 32768
+    }
+    return model_token_limits.get(model, 4096)
+
 def calculate_token_count(text, model):
     """주어진 텍스트의 토큰 수를 계산."""
-    # 모델에 따라 적절한 엔코더를 선택
-    encoder = tiktoken.encoding_for_model(model)
-    token_count = len(encoder.encode(text))
-    return token_count
-
+    try:
+        encoder = tiktoken.encoding_for_model(model)
+        return len(encoder.encode(text))
+    except Exception as e:
+        logging.error(f"토큰 계산 중 오류 발생: {str(e)}")
+        return len(text.split())  # fallback: 단어 수로 대략적인 추정
+    
+    
 def truncate_conversation_history(conversation_history, model, max_tokens):
     """대화 히스토리를 최대 토큰 수에 맞게 자릅니다."""
-    encoder = tiktoken.encoding_for_model(model)
-    tokenized_messages = encoder.encode(conversation_history)
-    
-    if len(tokenized_messages) <= max_tokens:
-        return conversation_history
-    
-    truncated_messages = tokenized_messages[-max_tokens:]
-    return encoder.decode(truncated_messages)
+    try:
+        encoder = tiktoken.encoding_for_model(model)
+        tokenized_messages = encoder.encode(conversation_history)
+        
+        if len(tokenized_messages) <= max_tokens:
+            return conversation_history
+        
+        truncated_messages = tokenized_messages[-max_tokens:]
+        return encoder.decode(truncated_messages)
+    except Exception as e:
+        logging.error(f"대화 히스토리 자르기 중 오류 발생: {str(e)}")
+        words = conversation_history.split()
+        return " ".join(words[-max_tokens:])  # fallback: 단어 단위로 자르기
 
 def generate_response(prompt, api_key, model):
     """OpenAI API를 사용하여 응답 생성."""
     
-    model_token_limits = {
-        "gpt-3.5-turbo": 4096,
-        "gpt-4": 8192,
-        "gpt-4-32k": 32768
-   
-    }
     
     # 모델의 최대 토큰 한도를 가져옴
-    max_total_tokens = model_token_limits.get(model, 4096)  # 모델을 찾지 못하면 기본값은 4096
+    max_total_tokens = get_token_limit(model)
     max_prompt_tokens = max_total_tokens // 2  # 프롬프트에 전체 토큰의 절반만 사용
     
     try:
         client = init_openai_client(api_key)
         
- # 프롬프트 토큰 계산 및 제한
+        # 프롬프트 토큰 계산 및 제한
         prompt_tokens = calculate_token_count(prompt, model)
         if prompt_tokens > max_prompt_tokens:
             prompt = truncate_conversation_history(prompt, model, max_prompt_tokens)
             prompt_tokens = calculate_token_count(prompt, model)
         
-        # 프롬프트 토큰을 뺀 전체 토큰 한도를 기준으로 응답을 위한 max_tokens 설정
-        max_tokens = max_total_tokens - prompt_tokens
+        # 응답을 위한 max_tokens 설정
+        max_tokens = max_total_tokens - prompt_tokens - 100  # 안전 마진 100 토큰
         
          # 토큰 수가 0 이하로 설정되지 않도록 보장
         if max_tokens <= 0:
@@ -88,8 +99,8 @@ def generate_response(prompt, api_key, model):
 
 def generate_website_code(conversation_history, company_name, industry, primary_color, api_key, model):
     """Generate website HTML code based on conversation history."""
-    
-    prompt = f"""당신은 숙련된 웹 개발자이자 디자이너입니다. 
+    max_tokens = get_token_limit(model)
+    prompt_template = f"""당신은 숙련된 웹 개발자이자 디자이너입니다.  
     다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
 
     회사명: {company_name}
@@ -143,8 +154,13 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다.
     """
   
+    # 대화 내용을 토큰 제한에 맞게 조정
+    max_conversation_tokens = max_tokens - calculate_token_count(prompt_template.format(conversation=""), model) - 1000  # 여유 공간
+    truncated_conversation = truncate_conversation_history(conversation_history, model, max_conversation_tokens)
     
-    logging.info(f"프롬프트 내용: {prompt}")
+    prompt = prompt_template.format(conversation=truncated_conversation)
+    
+    logging.info(f"프롬프트 토큰 수: {calculate_token_count(prompt, model)}")
     
     response = generate_response(prompt, api_key, model)
     
@@ -214,8 +230,8 @@ if st.session_state.api_key:
     # 모델 선택 옵션
     model = st.sidebar.selectbox(
         "모델 선택:",
-        ("gpt-3.5-turbo", "gpt-4", "gpt-4-32k"),
-        index=1
+        ("gpt-3.5-turbo", "gpt-3.5-turbo-16k", "gpt-4", "gpt-4-32k"),
+        index=0
     )
     
     for message in st.session_state.messages:
