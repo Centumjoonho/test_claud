@@ -28,7 +28,7 @@ def generate_response(prompt, api_key):
         client = init_openai_client(api_key)
         
       
-        max_tokens = 10384 
+        max_tokens = 13384 
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -75,7 +75,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
                 - 각 제품/서비스를 대표하는 실제 이미지 사용
                 - 구체적인 제품/서비스명과 2-3문장의 설명 제공
             e. 회사 소개 섹션:
-                - 팀워크 또는 회사 가치를 나타내는 실제 이미지 사용
+                - 팀워크 또는 회사 가치를 나타내는 실제 Unsplash URL을 사용하세요 예: https://images.unsplash.com/photo-1531403009284-440f080d1e12?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80
                 - 회사의 미션, 비전, 핵심 가치에 대한 3-4문장의 구체적인 설명
             f. 고객 후기 섹션:
                 - 2-3개의 구체적인 고객 후기 (각 1-2문장, 고객 이름과 직책 포함)
@@ -227,7 +227,7 @@ if st.session_state.api_key:
         
         if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
             st.subheader("웹사이트 미리보기")
-            st.components.v1.html(st.session_state.website_code, height=1600, scrolling=True)
+            st.components.v1.html(st.session_state.website_code, height=1200, scrolling=True)
         else:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
