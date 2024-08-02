@@ -37,7 +37,7 @@ def generate_response(prompt, api_key, model):
     model_token_limits = {
         "gpt-3.5-turbo": 4096,
         "gpt-4": 8192,
-        "gpt-4-32k": 32768  # 32k 컨텍스트 모델의 예시
+   
     }
     
     # 모델의 최대 토큰 한도를 가져옴
@@ -51,6 +51,11 @@ def generate_response(prompt, api_key, model):
         
         # 프롬프트 토큰을 뺀 전체 토큰 한도를 기준으로 응답을 위한 max_tokens 설정
         max_tokens = max_total_tokens - prompt_tokens
+        
+         # 토큰 수가 0 이하로 설정되지 않도록 보장
+        if max_tokens <= 0:
+            st.error("프롬프트가 너무 길어서 응답을 생성할 수 없습니다.")
+            return None
         
         response = client.chat.completions.create(
             model=model,
