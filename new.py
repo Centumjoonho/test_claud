@@ -27,21 +27,9 @@ def generate_response(prompt, api_key):
     try:
         client = init_openai_client(api_key)
         
-        # 입력 프롬프트의 토큰 수 계산
-        input_tokens = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=0  # 토큰 수만 계산하기 위해 0으로 설정
-        ).usage.prompt_tokens
-
-        # 최대 가능한 출력 토큰 수 계산
-        max_output_tokens = 128000 - input_tokens
-        
-        # 안전 마진을 위해 약간 줄임 (예: 100 토큰)
-        max_output_tokens = max(0, max_output_tokens - 100)
+      # gpt-4-turbo-preview의 최대 토큰 수는 128,000입니다.
+        # 안전 마진으로 4,000 토큰을 남겨둡니다.
+        max_tokens = 124000
 
         response = client.chat.completions.create(
             model="gpt-4-turbo-preview",
@@ -49,7 +37,7 @@ def generate_response(prompt, api_key):
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=max_output_tokens
+            max_tokens=max_tokens
         )
         return response.choices[0].message.content
     except Exception as e:
