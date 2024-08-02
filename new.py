@@ -27,12 +27,11 @@ def generate_response(prompt, api_key):
     try:
         client = init_openai_client(api_key)
         
-      # gpt-4-turbo-preview의 최대 토큰 수는 128,000입니다.
-        # 안전 마진으로 4,000 토큰을 남겨둡니다.
-        max_tokens = 124000
+      
+        max_tokens = 20000 
 
         response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-4-32k",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
