@@ -18,6 +18,8 @@ if 'industry' not in st.session_state:
     st.session_state.industry = ""
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
+if 'primary_color' not in st.session_state:
+    st.session_state.primary_color = "#000000"
 
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
@@ -123,7 +125,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     
     logging.info(f"프롬프트 내용: {prompt}")
     
-    response = generate_response(prompt, api_key)
+    response = generate_response(prompt, api_key, model)
     
     if response:
         logging.info(f"API 응답 길이: {len(response)}")
