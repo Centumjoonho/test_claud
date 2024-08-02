@@ -205,7 +205,7 @@ if st.session_state.api_key:
     prompt = st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:")
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
-        response = generate_response(prompt, st.session_state.api_key)
+        response = generate_response(prompt, st.session_state.api_key, model)
         if response:
             st.session_state.messages.append({"role": "assistant", "content": response})
         
