@@ -31,23 +31,39 @@ def calculate_token_count(text, model):
     token_count = len(encoder.encode(text))
     return token_count
 
+def truncate_conversation_history(conversation_history, model, max_tokens):
+    """대화 히스토리를 최대 토큰 수에 맞게 자릅니다."""
+    encoder = tiktoken.encoding_for_model(model)
+    tokenized_messages = encoder.encode(conversation_history)
+    
+    if len(tokenized_messages) <= max_tokens:
+        return conversation_history
+    
+    truncated_messages = tokenized_messages[-max_tokens:]
+    return encoder.decode(truncated_messages)
+
 def generate_response(prompt, api_key, model):
     """OpenAI API를 사용하여 응답 생성."""
     
     model_token_limits = {
         "gpt-3.5-turbo": 4096,
         "gpt-4": 8192,
+        "gpt-4-32k": 32768
    
     }
     
     # 모델의 최대 토큰 한도를 가져옴
     max_total_tokens = model_token_limits.get(model, 4096)  # 모델을 찾지 못하면 기본값은 4096
+    max_prompt_tokens = max_total_tokens // 2  # 프롬프트에 전체 토큰의 절반만 사용
     
     try:
         client = init_openai_client(api_key)
         
-        # 프롬프트 토큰 계산
+ # 프롬프트 토큰 계산 및 제한
         prompt_tokens = calculate_token_count(prompt, model)
+        if prompt_tokens > max_prompt_tokens:
+            prompt = truncate_conversation_history(prompt, model, max_prompt_tokens)
+            prompt_tokens = calculate_token_count(prompt, model)
         
         # 프롬프트 토큰을 뺀 전체 토큰 한도를 기준으로 응답을 위한 max_tokens 설정
         max_tokens = max_total_tokens - prompt_tokens
@@ -70,7 +86,7 @@ def generate_response(prompt, api_key, model):
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
-def generate_website_code(conversation_history, company_name, industry, primary_color, api_key):
+def generate_website_code(conversation_history, company_name, industry, primary_color, api_key, model):
     """Generate website HTML code based on conversation history."""
     
     prompt = f"""당신은 숙련된 웹 개발자이자 디자이너입니다. 
@@ -172,13 +188,11 @@ if st.session_state.api_key:
         with st.form("company_info"):
             company_name = st.text_input("회사명을 입력해주세요:")
             industry = st.text_input("업종을 입력해주세요:")
-            # primary_color = st.color_picker("주 색상을 선택해주세요:", "#000000")
             submit_button = st.form_submit_button("대화 시작하기")
         
         if submit_button:
             st.session_state.company_name = company_name
             st.session_state.industry = industry
-            # st.session_state.primary_color = primary_color
             st.session_state.messages.append({
                 "role": "system", 
                 "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
@@ -196,7 +210,6 @@ if st.session_state.api_key:
             "role": "system",
             "content": f"주 색상이 {new_color}로 변경되었습니다."
         })
-        
     
     # 모델 선택 옵션
     model = st.sidebar.selectbox(
@@ -223,7 +236,8 @@ if st.session_state.api_key:
             st.session_state.company_name, 
             st.session_state.industry, 
             st.session_state.primary_color,
-            st.session_state.api_key
+            st.session_state.api_key,
+            model
         )
     
     # 생성된 코드 표시
