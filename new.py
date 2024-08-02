@@ -24,32 +24,15 @@ def init_openai_client(api_key):
 
 def generate_response(prompt, api_key):
     """Generate a response using OpenAI API."""
-    
-    model_token_limits = {
-        "gpt-3.5-turbo": 4096,
-        "gpt-4": 8192,
-        "gpt-4-32k": 32768  # Example for models with 32k context
-    }
-    
-    # 모델의 최대 토큰 한도를 가져옴
-    max_total_tokens = model_token_limits.get(model, 4096)  # 모델을 찾지 못하면 기본값은 4096
-    
     try:
         client = init_openai_client(api_key)
-        
-        # 프롬프트 토큰 계산
-        prompt_tokens = len(client.tokenizer.encode(prompt))
-        
-        # 프롬프트 토큰을 뺀 전체 토큰 한도를 기준으로 응답을 위한 max_tokens 설정
-        max_tokens = max_total_tokens - prompt_tokens
-        
         response = client.chat.completions.create(
-            model=model,
+            model="gpt-4",  # 또는 원하는 모델
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=max_tokens  # 프롬프트를 제외한 최대 토큰 사용
+            max_tokens=3000
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -64,7 +47,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
             회사명: {company_name}
             업종: {industry}
             주 색상: {primary_color}
-            대화내용:{conversation_history}
+            대화내용 : {conversation_history}
 
             완전한 HTML5 구조의 단일 페이지 웹사이트를 생성해주세요. 다음 요구사항을 반드시 포함하여 구현해주세요:
 
@@ -142,7 +125,6 @@ def generate_website_code(conversation_history, company_name, industry, primary_
 
             최종 결과물에는 {company_name}의 특성을 반영한 완전한 웹사이트 코드가 포함되어야 하며, 실제 구현 시 쉽게 customizing할 수 있도록 변수나 클래스명을 직관적으로 작성해주세요.
         """
-  
     
     logging.info(f"프롬프트 내용: {prompt}")
     
@@ -188,13 +170,13 @@ if st.session_state.api_key:
         with st.form("company_info"):
             company_name = st.text_input("회사명을 입력해주세요:")
             industry = st.text_input("업종을 입력해주세요:")
-            # primary_color = st.color_picker("주 색상을 선택해주세요:", "#000000")
+            primary_color = st.color_picker("주 색상을 선택해주세요:", "#000000")
             submit_button = st.form_submit_button("대화 시작하기")
         
         if submit_button:
             st.session_state.company_name = company_name
             st.session_state.industry = industry
-            # st.session_state.primary_color = primary_color
+            st.session_state.primary_color = primary_color
             st.session_state.messages.append({
                 "role": "system", 
                 "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
@@ -212,14 +194,6 @@ if st.session_state.api_key:
             "role": "system",
             "content": f"주 색상이 {new_color}로 변경되었습니다."
         })
-        
-    
-    # 모델 선택 옵션
-    model = st.sidebar.selectbox(
-        "모델 선택:",
-        ("gpt-3.5-turbo", "gpt-4", "gpt-4-32k"),
-        index=1
-    )
     
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
