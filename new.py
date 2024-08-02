@@ -18,106 +18,53 @@ if 'industry' not in st.session_state:
     st.session_state.industry = ""
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
-if 'primary_color' not in st.session_state:
-    st.session_state.primary_color = "#000000"
 
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
 
-def get_token_limit(model):
+def generate_response(prompt, api_key):
+    """Generate a response using OpenAI API."""
+    
     model_token_limits = {
         "gpt-3.5-turbo": 4096,
-        "gpt-3.5-turbo-16k": 16384,
         "gpt-4": 8192,
-        "gpt-4-32k": 32768
+        "gpt-4-32k": 32768  # Example for models with 32k context
     }
-    return model_token_limits.get(model, 4096)
-
-def get_tiktoken_model_name(model):
-    """OpenAI API 모델명을 tiktoken 모델명으로 변환"""
-    model_mapping = {
-        "gpt-3.5-turbo": "gpt-3.5-turbo",
-        "gpt-3.5-turbo-16k": "gpt-3.5-turbo-16k",
-        "gpt-4": "gpt-4",
-        "gpt-4-32k": "gpt-4-32k",
-    }
-    return model_mapping.get(model, "gpt-3.5-turbo")
-
-def calculate_token_count(text, model):
-    """주어진 텍스트의 토큰 수를 계산."""
-    try:
-        tiktoken_model = get_tiktoken_model_name(model)
-        encoder = tiktoken.encoding_for_model(tiktoken_model)
-        return len(encoder.encode(text))
-    except KeyError:
-        logging.warning(f"Model {model} not found, using cl100k_base encoding.")
-        encoder = tiktoken.get_encoding("cl100k_base")
-        return len(encoder.encode(text))
-    except Exception as e:
-        logging.error(f"토큰 계산 중 오류 발생: {str(e)}")
-        return len(text.split())  # fallback: 단어 수로 대략적인 추정
     
-    
-def truncate_conversation_history(conversation_history, model, max_tokens):
-    """대화 히스토리를 최대 토큰 수에 맞게 자릅니다."""
-    try:
-        tiktoken_model = get_tiktoken_model_name(model)
-        encoder = tiktoken.encoding_for_model(tiktoken_model)
-        tokenized_messages = encoder.encode(conversation_history)
-        
-        if len(tokenized_messages) <= max_tokens:
-            return conversation_history
-        
-        truncated_messages = tokenized_messages[-max_tokens:]
-        return encoder.decode(truncated_messages)
-    except Exception as e:
-        logging.error(f"대화 히스토리 자르기 중 오류 발생: {str(e)}")
-        words = conversation_history.split()
-        return " ".join(words[-max_tokens:])  # fallback: 단어 단위로 자르기
-
-def generate_response(prompt, api_key, model):
-    """OpenAI API를 사용하여 응답 생성."""
-    max_total_tokens = get_token_limit(model)
-    max_prompt_tokens = max_total_tokens // 2  # 프롬프트에 전체 토큰의 절반만 사용
+    # 모델의 최대 토큰 한도를 가져옴
+    max_total_tokens = model_token_limits.get(model, 4096)  # 모델을 찾지 못하면 기본값은 4096
     
     try:
         client = init_openai_client(api_key)
         
-        prompt_tokens = calculate_token_count(prompt, model)
-        if prompt_tokens > max_prompt_tokens:
-            prompt = truncate_conversation_history(prompt, model, max_prompt_tokens)
-            prompt_tokens = calculate_token_count(prompt, model)
+        # 프롬프트 토큰 계산
+        prompt_tokens = len(client.tokenizer.encode(prompt))
         
-        max_tokens = max_total_tokens - prompt_tokens - 100  # 안전 마진 100 토큰
+        # 프롬프트 토큰을 뺀 전체 토큰 한도를 기준으로 응답을 위한 max_tokens 설정
+        max_tokens = max_total_tokens - prompt_tokens
         
-        if max_tokens <= 0:
-            st.error("프롬프트가 너무 길어서 응답을 생성할 수 없습니다.")
-            return None
-        
-        logging.debug(f"Sending request to OpenAI API. Model: {model}, Max tokens: {max_tokens}")
         response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=max_tokens
+            max_tokens=max_tokens  # 프롬프트를 제외한 최대 토큰 사용
         )
         return response.choices[0].message.content
     except Exception as e:
-        logging.error(f"API 호출 중 오류 발생: {str(e)}")
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
-def generate_website_code(conversation_history, company_name, industry, primary_color, api_key, model):
+def generate_website_code(conversation_history, company_name, industry, primary_color, api_key):
     """Generate website HTML code based on conversation history."""
-    try:  
-        max_tokens = get_token_limit(model)
-        prompt_template = f"""숙련된 웹 개발자이자 디자이너로서, 다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
+    
+    prompt = f"""숙련된 웹 개발자이자 디자이너로서, 다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
 
             회사명: {company_name}
             업종: {industry}
             주 색상: {primary_color}
+            대화내용:{conversation_history}
 
             완전한 HTML5 구조의 단일 페이지 웹사이트를 생성해주세요. 다음 요구사항을 반드시 포함하여 구현해주세요:
 
@@ -196,25 +143,16 @@ def generate_website_code(conversation_history, company_name, industry, primary_
             최종 결과물에는 {company_name}의 특성을 반영한 완전한 웹사이트 코드가 포함되어야 하며, 실제 구현 시 쉽게 customizing할 수 있도록 변수나 클래스명을 직관적으로 작성해주세요.
         """
   
-        # 대화 내용을 토큰 제한에 맞게 조정
-        max_conversation_tokens = max_tokens - calculate_token_count(prompt_template.format(conversation=""), model) - 1000  # 여유 공간
-        truncated_conversation = truncate_conversation_history(conversation_history, model, max_conversation_tokens)
-        
-        prompt = prompt_template.format(conversation=truncated_conversation)
-        
-        logging.info(f"프롬프트 토큰 수: {calculate_token_count(prompt, model)}")
-        
-        response = generate_response(prompt, api_key, model)
-        
-        if response:
-            logging.info(f"API 응답 길이: {len(response)}")
-            return clean_html(response)
-            
-        return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
-    except Exception as e:
-            logging.error(f"웹사이트 코드 생성 중 오류 발생: {str(e)}")
-            st.error(f"웹사이트 코드 생성 중 오류가 발생했습니다: {str(e)}")
-            return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
+    
+    logging.info(f"프롬프트 내용: {prompt}")
+    
+    response = generate_response(prompt, api_key)
+    
+    if response:
+        logging.info(f"API 응답 길이: {len(response)}")
+        return clean_html(response)
+    
+    return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
 
 def clean_html(html):
     """Clean and validate HTML code."""
@@ -250,11 +188,13 @@ if st.session_state.api_key:
         with st.form("company_info"):
             company_name = st.text_input("회사명을 입력해주세요:")
             industry = st.text_input("업종을 입력해주세요:")
+            # primary_color = st.color_picker("주 색상을 선택해주세요:", "#000000")
             submit_button = st.form_submit_button("대화 시작하기")
         
         if submit_button:
             st.session_state.company_name = company_name
             st.session_state.industry = industry
+            # st.session_state.primary_color = primary_color
             st.session_state.messages.append({
                 "role": "system", 
                 "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
@@ -272,12 +212,13 @@ if st.session_state.api_key:
             "role": "system",
             "content": f"주 색상이 {new_color}로 변경되었습니다."
         })
+        
     
     # 모델 선택 옵션
     model = st.sidebar.selectbox(
         "모델 선택:",
-        ("gpt-3.5-turbo", "gpt-3.5-turbo-16k", "gpt-4", "gpt-4-32k"),
-        index=0
+        ("gpt-3.5-turbo", "gpt-4", "gpt-4-32k"),
+        index=1
     )
     
     for message in st.session_state.messages:
@@ -287,7 +228,7 @@ if st.session_state.api_key:
     prompt = st.chat_input("웹사이트에 대한 요구사항을 말씀해주세요:")
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
-        response = generate_response(prompt, st.session_state.api_key, model)
+        response = generate_response(prompt, st.session_state.api_key)
         if response:
             st.session_state.messages.append({"role": "assistant", "content": response})
         
@@ -298,8 +239,7 @@ if st.session_state.api_key:
             st.session_state.company_name, 
             st.session_state.industry, 
             st.session_state.primary_color,
-            st.session_state.api_key,
-            model
+            st.session_state.api_key
         )
     
     # 생성된 코드 표시
