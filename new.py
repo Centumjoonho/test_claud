@@ -2,7 +2,7 @@ import logging
 import streamlit as st
 from openai import OpenAI
 import re
-
+import tiktoken
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -22,13 +22,20 @@ if 'api_key' not in st.session_state:
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
 
-def generate_response(prompt, api_key):
-    """Generate a response using OpenAI API."""
+def calculate_token_count(text, model):
+    """주어진 텍스트의 토큰 수를 계산."""
+    # 모델에 따라 적절한 엔코더를 선택
+    encoder = tiktoken.encoding_for_model(model)
+    token_count = len(encoder.encode(text))
+    return token_count
+
+def generate_response(prompt, api_key, model):
+    """OpenAI API를 사용하여 응답 생성."""
     
     model_token_limits = {
         "gpt-3.5-turbo": 4096,
         "gpt-4": 8192,
-        "gpt-4-32k": 32768  # Example for models with 32k context
+        "gpt-4-32k": 32768  # 32k 컨텍스트 모델의 예시
     }
     
     # 모델의 최대 토큰 한도를 가져옴
@@ -38,7 +45,7 @@ def generate_response(prompt, api_key):
         client = init_openai_client(api_key)
         
         # 프롬프트 토큰 계산
-        prompt_tokens = len(client.tokenizer.encode(prompt))
+        prompt_tokens = calculate_token_count(prompt, model)
         
         # 프롬프트 토큰을 뺀 전체 토큰 한도를 기준으로 응답을 위한 max_tokens 설정
         max_tokens = max_total_tokens - prompt_tokens
