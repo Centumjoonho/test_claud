@@ -174,13 +174,13 @@ if st.session_state.api_key:
         with st.form("company_info"):
             company_name = st.text_input("회사명을 입력해주세요:")
             industry = st.text_input("업종을 입력해주세요:")
-            primary_color = st.color_picker("주 색상을 선택해주세요:", "#000000")
+            # primary_color = st.color_picker("주 색상을 선택해주세요:", "#000000")
             submit_button = st.form_submit_button("대화 시작하기")
         
         if submit_button:
             st.session_state.company_name = company_name
             st.session_state.industry = industry
-            st.session_state.primary_color = primary_color
+            # st.session_state.primary_color = primary_color
             st.session_state.messages.append({
                 "role": "system", 
                 "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
@@ -227,7 +227,7 @@ if st.session_state.api_key:
         
         if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
             st.subheader("웹사이트 미리보기")
-            st.components.v1.html(st.session_state.website_code, height=800, scrolling=True)
+            st.components.v1.html(st.session_state.website_code, height=1600, scrolling=True)
         else:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
