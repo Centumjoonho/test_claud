@@ -33,10 +33,25 @@ def get_token_limit(model):
     }
     return model_token_limits.get(model, 4096)
 
+def get_tiktoken_model_name(model):
+    """OpenAI API 모델명을 tiktoken 모델명으로 변환"""
+    model_mapping = {
+        "gpt-3.5-turbo": "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k": "gpt-3.5-turbo-16k",
+        "gpt-4": "gpt-4",
+        "gpt-4-32k": "gpt-4-32k",
+    }
+    return model_mapping.get(model, "gpt-3.5-turbo")
+
 def calculate_token_count(text, model):
     """주어진 텍스트의 토큰 수를 계산."""
     try:
-        encoder = tiktoken.encoding_for_model(model)
+        tiktoken_model = get_tiktoken_model_name(model)
+        encoder = tiktoken.encoding_for_model(tiktoken_model)
+        return len(encoder.encode(text))
+    except KeyError:
+        logging.warning(f"Model {model} not found, using cl100k_base encoding.")
+        encoder = tiktoken.get_encoding("cl100k_base")
         return len(encoder.encode(text))
     except Exception as e:
         logging.error(f"토큰 계산 중 오류 발생: {str(e)}")
@@ -46,7 +61,8 @@ def calculate_token_count(text, model):
 def truncate_conversation_history(conversation_history, model, max_tokens):
     """대화 히스토리를 최대 토큰 수에 맞게 자릅니다."""
     try:
-        encoder = tiktoken.encoding_for_model(model)
+        tiktoken_model = get_tiktoken_model_name(model)
+        encoder = tiktoken.encoding_for_model(tiktoken_model)
         tokenized_messages = encoder.encode(conversation_history)
         
         if len(tokenized_messages) <= max_tokens:
@@ -61,114 +77,115 @@ def truncate_conversation_history(conversation_history, model, max_tokens):
 
 def generate_response(prompt, api_key, model):
     """OpenAI API를 사용하여 응답 생성."""
-    
-    
-    # 모델의 최대 토큰 한도를 가져옴
     max_total_tokens = get_token_limit(model)
     max_prompt_tokens = max_total_tokens // 2  # 프롬프트에 전체 토큰의 절반만 사용
     
     try:
         client = init_openai_client(api_key)
         
-        # 프롬프트 토큰 계산 및 제한
         prompt_tokens = calculate_token_count(prompt, model)
         if prompt_tokens > max_prompt_tokens:
             prompt = truncate_conversation_history(prompt, model, max_prompt_tokens)
             prompt_tokens = calculate_token_count(prompt, model)
         
-        # 응답을 위한 max_tokens 설정
         max_tokens = max_total_tokens - prompt_tokens - 100  # 안전 마진 100 토큰
         
-         # 토큰 수가 0 이하로 설정되지 않도록 보장
         if max_tokens <= 0:
             st.error("프롬프트가 너무 길어서 응답을 생성할 수 없습니다.")
             return None
         
+        logging.debug(f"Sending request to OpenAI API. Model: {model}, Max tokens: {max_tokens}")
         response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=max_tokens  # 프롬프트를 제외한 최대 토큰 사용
+            max_tokens=max_tokens
         )
         return response.choices[0].message.content
     except Exception as e:
+        logging.error(f"API 호출 중 오류 발생: {str(e)}")
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
 def generate_website_code(conversation_history, company_name, industry, primary_color, api_key, model):
     """Generate website HTML code based on conversation history."""
-    max_tokens = get_token_limit(model)
-    prompt_template = f"""당신은 숙련된 웹 개발자이자 디자이너입니다.  
-    다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
+    try:  
+        max_tokens = get_token_limit(model)
+        prompt_template = f"""당신은 숙련된 웹 개발자이자 디자이너입니다.  
+        다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
 
-    회사명: {company_name}
-    업종: {industry}
-    주 색상: {primary_color}
-    대화 내용: {conversation_history}
+        회사명: {company_name}
+        업종: {industry}
+        주 색상: {primary_color}
+        대화 내용: {conversation_history}
 
-    이전에 생성된 웹사이트 코드가 있다면, 그것을 기반으로 업데이트하고 개선해주세요.
-    새로운 요구사항이 있다면 그에 맞게 웹사이트를 수정하고 확장해주세요.
+        이전에 생성된 웹사이트 코드가 있다면, 그것을 기반으로 업데이트하고 개선해주세요.
+        새로운 요구사항이 있다면 그에 맞게 웹사이트를 수정하고 확장해주세요.
 
-    반드시 다음 사항을 지켜주세요:
+        반드시 다음 사항을 지켜주세요:
 
-    1. **완전한 HTML5 구조**를 사용하세요. `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>` 태그를 모두 포함해야 합니다.
+        1. **완전한 HTML5 구조**를 사용하세요. `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>` 태그를 모두 포함해야 합니다.
 
-    2. **최신 CSS 기술**을 활용한 스타일을 `<style>` 태그 내에 포함하세요. Flexbox와 Grid를 사용하여 레이아웃을 구성하고, 반응형 디자인을 위한 미디어 쿼리를 추가하여 모바일, 태블릿, 데스크톱 화면 크기를 고려하세요.
+        2. **최신 CSS 기술**을 활용한 스타일을 `<style>` 태그 내에 포함하세요. Flexbox와 Grid를 사용하여 레이아웃을 구성하고, 반응형 디자인을 위한 미디어 쿼리를 추가하여 모바일, 태블릿, 데스크톱 화면 크기를 고려하세요.
 
-    3. **현대적이고 전문적인 디자인**을 적용하세요. 예를 들어:
-    - 그라데이션 배경 색상
-    - 그림자 효과와 부드러운 애니메이션
-    - 버튼과 링크에 대한 호버 효과
+        3. **현대적이고 전문적인 디자인**을 적용하세요. 예를 들어:
+        - 그라데이션 배경 색상
+        - 그림자 효과와 부드러운 애니메이션
+        - 버튼과 링크에 대한 호버 효과
 
-    4. **기본적인 웹사이트 구조**를 포함하세요: 
-    - 헤더: 로고, 네비게이션 메뉴
-    - 메인 콘텐츠 영역: 홈페이지, 제품/서비스 소개, 회사 소개 등
-    - 푸터: 저작권 정보, 연락처, 소셜 미디어 링크
+        4. **기본적인 웹사이트 구조**를 포함하세요: 
+        - 헤더: 로고, 네비게이션 메뉴
+        - 메인 콘텐츠 영역: 홈페이지, 제품/서비스 소개, 회사 소개 등
+        - 푸터: 저작권 정보, 연락처, 소셜 미디어 링크
 
-    5. 주 색상으로 {primary_color}를 사용하고, 이에 어울리는 보조 색상을 선택하여 조화로운 색상 팔레트를 구성하세요.
+        5. 주 색상으로 {primary_color}를 사용하고, 이에 어울리는 보조 색상을 선택하여 조화로운 색상 팔레트를 구성하세요.
 
-    6. **Font Awesome 아이콘**을 활용하여 시각적 요소를 추가하세요. 
-    (CDN 링크: https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css)
+        6. **Font Awesome 아이콘**을 활용하여 시각적 요소를 추가하세요. 
+        (CDN 링크: https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css)
 
-    7. **다음과 같은 기본적인 JavaScript 기능**을 추가하세요:
-    - 스크롤 애니메이션: 페이지 스크롤 시 요소들이 부드럽게 나타나도록 구현
-    - 간단한 이미지 슬라이더 또는 캐러셀
-    - 모바일 환경을 위한 햄버거 메뉴
+        7. **다음과 같은 기본적인 JavaScript 기능**을 추가하세요:
+        - 스크롤 애니메이션: 페이지 스크롤 시 요소들이 부드럽게 나타나도록 구현
+        - 간단한 이미지 슬라이더 또는 캐러셀
+        - 모바일 환경을 위한 햄버거 메뉴
 
-    8. 회사의 업종과 목표 고객을 고려한 적절한 콘텐츠를 작성하세요. 필요한 경우 일반적인 더미 텍스트를 사용하세요.
+        8. 회사의 업종과 목표 고객을 고려한 적절한 콘텐츠를 작성하세요. 필요한 경우 일반적인 더미 텍스트를 사용하세요.
 
-    9. **SEO를 위한 기본적인 메타 태그와 오픈 그래프 태그**를 포함하세요.
+        9. **SEO를 위한 기본적인 메타 태그와 오픈 그래프 태그**를 포함하세요.
 
-    10. **웹 접근성 가이드라인(WCAG)의 기본 원칙**을 준수하세요. 적절한 대체 텍스트, 키보드 네비게이션, 충분한 색상 대비 등을 고려하세요.
+        10. **웹 접근성 가이드라인(WCAG)의 기본 원칙**을 준수하세요. 적절한 대체 텍스트, 키보드 네비게이션, 충분한 색상 대비 등을 고려하세요.
 
-    11. 가독성이 좋은 **sans-serif 계열의 폰트**를 사용하세요. Google Fonts에서 적절한 폰트를 선택하여 적용해주세요. 예를 들어, 'Roboto', 'Open Sans', 'Lato' 등을 사용하세요.
+        11. 가독성이 좋은 **sans-serif 계열의 폰트**를 사용하세요. Google Fonts에서 적절한 폰트를 선택하여 적용해주세요. 예를 들어, 'Roboto', 'Open Sans', 'Lato' 등을 사용하세요.
 
-    12. **페이지 로딩 속도**를 고려하여 최적화된 코드를 작성해주세요.
+        12. **페이지 로딩 속도**를 고려하여 최적화된 코드를 작성해주세요.
 
-    13. 가능하다면 **CSS 프레임워크 (예: Bootstrap)**를 사용하여 디자인을 강화하세요.
+        13. 가능하다면 **CSS 프레임워크 (예: Bootstrap)**를 사용하여 디자인을 강화하세요.
 
-    14. **더 많은 디자인 예시와 비주얼**을 제공해 주세요.
+        14. **더 많은 디자인 예시와 비주얼**을 제공해 주세요.
 
-    HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다.
-    """
+        HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다.
+        """
   
-    # 대화 내용을 토큰 제한에 맞게 조정
-    max_conversation_tokens = max_tokens - calculate_token_count(prompt_template.format(conversation=""), model) - 1000  # 여유 공간
-    truncated_conversation = truncate_conversation_history(conversation_history, model, max_conversation_tokens)
-    
-    prompt = prompt_template.format(conversation=truncated_conversation)
-    
-    logging.info(f"프롬프트 토큰 수: {calculate_token_count(prompt, model)}")
-    
-    response = generate_response(prompt, api_key, model)
-    
-    if response:
-        logging.info(f"API 응답 길이: {len(response)}")
-        return clean_html(response)
-    
-    return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
+        # 대화 내용을 토큰 제한에 맞게 조정
+        max_conversation_tokens = max_tokens - calculate_token_count(prompt_template.format(conversation=""), model) - 1000  # 여유 공간
+        truncated_conversation = truncate_conversation_history(conversation_history, model, max_conversation_tokens)
+        
+        prompt = prompt_template.format(conversation=truncated_conversation)
+        
+        logging.info(f"프롬프트 토큰 수: {calculate_token_count(prompt, model)}")
+        
+        response = generate_response(prompt, api_key, model)
+        
+        if response:
+            logging.info(f"API 응답 길이: {len(response)}")
+            return clean_html(response)
+            
+        return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
+    except Exception as e:
+            logging.error(f"웹사이트 코드 생성 중 오류 발생: {str(e)}")
+            st.error(f"웹사이트 코드 생성 중 오류가 발생했습니다: {str(e)}")
+            return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
 
 def clean_html(html):
     """Clean and validate HTML code."""
