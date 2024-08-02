@@ -2,7 +2,7 @@ import logging
 import streamlit as st
 from openai import OpenAI
 import re
-import tiktoken
+
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
