@@ -28,10 +28,10 @@ def generate_response(prompt, api_key):
         client = init_openai_client(api_key)
         
       
-        max_tokens = 20000 
+        max_tokens = 8384 
 
         response = client.chat.completions.create(
-            model="gpt-4-32k",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
