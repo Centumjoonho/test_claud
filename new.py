@@ -73,7 +73,18 @@ def generate_website_code(conversation_history, company_name, industry, api_key)
                 8. 웹 접근성 가이드라인을 준수하여 모든 사용자가 이용할 수 있는 웹사이트를 만들어주세요.
 
                 HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다.
+
+                중요: 반드시 전체 HTML 코드를 <ANTARTIFACTLINK> 태그로 감싸서 제공해야 합니다. 
                 
+                예시:
+                <ANTARTIFACTLINK identifier="generated-website" type="text/html" title="생성된 웹사이트">
+                <!DOCTYPE html>
+                <html>
+                ...
+                </html>
+                </ANTARTIFACTLINK>
+
+                오직 <ANTARTIFACTLINK> 태그로 감싼 HTML 코드만 제공하세요.
                 """
     
     logging.info(f"프롬프트 내용: {prompt}")
