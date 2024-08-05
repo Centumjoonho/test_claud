@@ -120,7 +120,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
                 - 슬로건: "{company_name} - {industry}의 혁신적인 솔루션"
                 - 1-2문장의 간단한 회사 소개 포함
             d. 제품/서비스 카드:
-                - 각 제품/서비스를 대표하는 각각 다른 이미지 사용: {product_image_url}
+                - 각 제품/서비스를 대표하는 각각 다른 이미지 사용: {product_image_urls}
                 - 구체적인 제품/서비스명과 2-3문장의 설명 제공
             e. 회사 소개 섹션:
                 - 팀워크 또는 회사 가치를 나타내는 이미지 사용: {about_image_url}
