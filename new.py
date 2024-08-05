@@ -89,14 +89,14 @@ def generate_website_code(conversation_history, company_name, industry, primary_
             a. 모든 이미지에 실제 Unsplash URL을 사용하세요. 
             b. 각 이미지에 적절한 alt 텍스트를 제공하세요.
             c. 히어로 섹션:
-                - 배경: {industry}를 대표하는 실제 Unsplash URL을 사용하세요 
+                - 배경: {industry}를 대표하는 실제 Unsplash URL을 사용하세요 "https://source.unsplash.com/featured/?{industry},technology,innovation" 
                 - 슬로건: "{company_name} - {industry}의 혁신적인 솔루션"
                 - 1-2문장의 간단한 회사 소개 포함
             d. 제품/서비스 카드:
-                - 각 제품/서비스를 대표하는 실제 이미지 사용
+                - 각 제품/서비스를 대표하는 실제 이미지 사용 "https://source.unsplash.com/featured/?{industry},design"
                 - 구체적인 제품/서비스명과 2-3문장의 설명 제공
             e. 회사 소개 섹션:
-                - 팀워크 또는 회사 가치를 나타내는 실제 Unsplash URL을 사용하세요 
+                - 팀워크 또는 회사 가치를 나타내는 실제 Unsplash URL을 사용하세요 "https://source.unsplash.com/featured/?introduce,design"
                 - 회사의 미션, 비전, 핵심 가치에 대한 3-4문장의 구체적인 설명
             f. 고객 후기 섹션:
                 - 2-3개의 구체적인 고객 후기 (각 1-2문장, 고객 이름과 직책 포함)
