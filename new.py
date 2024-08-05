@@ -4,7 +4,6 @@ from openai import OpenAI
 import re
 import requests
 
-
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 
@@ -20,6 +19,9 @@ if 'industry' not in st.session_state:
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
 
+# Unsplash API 키를 하드코딩
+UNSPLASH_CLIENT_ID = "AUo2EDi70vyR0pB5floEOnNAKq0SQjhvJFto0150dRM"  # 여기에 실제 Unsplash API 키를 입력하세요
+
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
 
@@ -27,9 +29,7 @@ def generate_response(prompt, api_key):
     """Generate a response using OpenAI API."""
     try:
         client = init_openai_client(api_key)
-        
-      
-        max_tokens = 14384 
+        max_tokens = 15384 
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -44,14 +44,26 @@ def generate_response(prompt, api_key):
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
+def search_unsplash_images(query):
+    """Search Unsplash for images based on a query."""
+    url = f"https://api.unsplash.com/search/photos"
+    headers = {
+        "Authorization": f"Client-ID {UNSPLASH_CLIENT_ID}"
+    }
+    params = {
+        "query": query,
+        "per_page": 1
+    }
+    response = requests.get(url, headers=headers, params=params)
+    data = response.json()
+    if data['results']:
+        return data['results'][0]['urls']['regular']
+    return "https://via.placeholder.com/800x600"  # Fallback placeholder image
 
-def get_image_url(generated_url):
-    """Return a valid image URL or a default placeholder."""
-    if is_valid_url(generated_url):
-        return generated_url
-    else:
-        return "https://via.placeholder.com/800x600"  # Fallback placeholder image    
-    
+def get_image_url(query):
+    """Get a valid image URL from Unsplash or a placeholder."""
+    return search_unsplash_images(query)
+
 def is_valid_url(url):
     """Check if the URL is valid and returns an image."""
     try:
@@ -61,12 +73,14 @@ def is_valid_url(url):
     except requests.RequestException:
         return False
 
-
-
-
 def generate_website_code(conversation_history, company_name, industry, primary_color, api_key):
     """Generate website HTML code based on conversation history."""
     
+    # Fetch images using Unsplash API
+    hero_image_url = get_image_url(f"{industry},technology,innovation")
+    product_image_url = get_image_url(f"{industry},design")
+    about_image_url = get_image_url("teamwork,values")
+
     prompt = f"""숙련된 웹 개발자이자 디자이너로서, 다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
 
             회사명: {company_name}
@@ -89,20 +103,20 @@ def generate_website_code(conversation_history, company_name, industry, primary_
             a. 모든 이미지에 실제 Unsplash URL을 사용하세요. 
             b. 각 이미지에 적절한 alt 텍스트를 제공하세요.
             c. 히어로 섹션:
-                - 배경: {industry}를 대표하는 실제 Unsplash URL을 사용하세요 "https://source.unsplash.com/featured/?{industry},technology,innovation" 
+                - 배경: {hero_image_url}
                 - 슬로건: "{company_name} - {industry}의 혁신적인 솔루션"
                 - 1-2문장의 간단한 회사 소개 포함
             d. 제품/서비스 카드:
-                - 각 제품/서비스를 대표하는 실제 이미지 사용 "https://source.unsplash.com/featured/?{industry},design"
+                - 각 제품/서비스를 대표하는 이미지 사용: {product_image_url}
                 - 구체적인 제품/서비스명과 2-3문장의 설명 제공
             e. 회사 소개 섹션:
-                - 팀워크 또는 회사 가치를 나타내는 실제 Unsplash URL을 사용하세요 "https://source.unsplash.com/featured/?introduce,design"
+                - 팀워크 또는 회사 가치를 나타내는 이미지 사용: {about_image_url}
                 - 회사의 미션, 비전, 핵심 가치에 대한 3-4문장의 구체적인 설명
             f. 고객 후기 섹션:
                 - 2-3개의 구체적인 고객 후기 (각 1-2문장, 고객 이름과 직책 포함)
             g. 블로그/뉴스 섹션:
                 - 3-4개의 실제적인 블로그 포스트 제목과 요약 (각 1-2문장)
-                - 각 포스트에 관련된 실제 썸네일 이미지 사용
+                - 각 포스트에 관련된 이미지 사용
 
             3. 디자인 요소:
             a. {primary_color}를 주 색상으로 사용하고, 이에 어울리는 구체적인 보조 색상 코드 제공
@@ -175,16 +189,18 @@ def clean_html(html):
         return None
     
     return html
+
 def validate_image_urls(html):
     """Validate image URLs in HTML and replace invalid ones."""
     # Use regular expression to find all img tags and extract URLs
     img_pattern = re.compile(r'<img\s+[^>]*src="([^"]+)"')
     matches = img_pattern.findall(html)
 
-    # Replace invalid URLs with placeholders
+    # Replace invalid URLs with Unsplash image URLs
     for url in matches:
-        valid_url = get_image_url(url)
-        html = html.replace(url, valid_url)
+        if not is_valid_url(url):
+            valid_url = get_image_url(url)
+            html = html.replace(url, valid_url)
 
     return html
 
@@ -208,13 +224,11 @@ if st.session_state.api_key:
         with st.form("company_info"):
             company_name = st.text_input("회사명을 입력해주세요:")
             industry = st.text_input("업종을 입력해주세요:")
-            # primary_color = st.color_picker("주 색상을 선택해주세요:", "#000000")
             submit_button = st.form_submit_button("대화 시작하기")
         
         if submit_button:
             st.session_state.company_name = company_name
             st.session_state.industry = industry
-            # st.session_state.primary_color = primary_color
             st.session_state.messages.append({
                 "role": "system", 
                 "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
