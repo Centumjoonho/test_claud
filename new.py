@@ -59,35 +59,21 @@ def generate_website_code(conversation_history, company_name, industry, api_key)
                    반응형 디자인을 위한 미디어 쿼리를 반드시 추가해주세요.
                 
                 3. 모던한 디자인 트렌드를 반영하여 시각적으로 매력적인 웹사이트를 만들어주세요.
-                   (예: 그라데이션, 그림자 효과, 부드러운 애니메이션 등)
+            
                 
                 4. 헤더, 네비게이션 메뉴, 메인 콘텐츠 영역, 사이드바(필요시), 푸터 등 기본적인 웹사이트 구조를 포함해주세요.
                 
                 5. 회사의 특성과 업종을 고려한 적절한 색상 스키마를 사용하세요.
                 
-                6. Font Awesome 아이콘을 활용하여 시각적 요소를 추가하세요. (CDN 링크: https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css)
                 
-                7. 간단한 JavaScript를 사용하여 동적 요소를 추가하세요. (예: 스크롤 애니메이션, 모달 팝업 등)
+                6. 요구사항에 맞는 실제 콘텐츠를 포함하되, 필요한 경우 적절한 더미 텍스트로 채워넣으세요.
                 
-                8. 요구사항에 맞는 실제 콘텐츠를 포함하되, 필요한 경우 적절한 더미 텍스트로 채워넣으세요.
+                7. SEO를 위한 메타 태그와 오픈 그래프 태그를 포함하세요.
                 
-                9. SEO를 위한 메타 태그와 오픈 그래프 태그를 포함하세요.
-                
-                10. 웹 접근성 가이드라인을 준수하여 모든 사용자가 이용할 수 있는 웹사이트를 만들어주세요.
+                8. 웹 접근성 가이드라인을 준수하여 모든 사용자가 이용할 수 있는 웹사이트를 만들어주세요.
 
                 HTML 코드만 제공해 주세요. 다른 설명은 필요 없습니다.
                 
-                중요: 반드시 전체 HTML 코드를 <ANTARTIFACTLINK> 태그로 감싸서 제공해야 합니다. 
-                
-                예시:
-                <ANTARTIFACTLINK identifier="generated-website" type="text/html" title="생성된 웹사이트">
-                <!DOCTYPE html>
-                <html>
-                ...
-                </html>
-                </ANTARTIFACTLINK>
-
-                오직 <ANTARTIFACTLINK> 태그로 감싼 HTML 코드만 제공하세요.
                 """
     
     logging.info(f"프롬프트 내용: {prompt}")
