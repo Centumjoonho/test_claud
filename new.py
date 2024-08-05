@@ -29,7 +29,7 @@ def generate_response(prompt, api_key):
         client = init_openai_client(api_key)
         
       
-        max_tokens = 13384 
+        max_tokens = 14384 
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
