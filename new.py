@@ -2,6 +2,7 @@ import logging
 import streamlit as st
 from openai import OpenAI
 import re
+import requests
 
 
 # 로깅 설정
@@ -42,6 +43,26 @@ def generate_response(prompt, api_key):
     except Exception as e:
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
+
+
+def get_image_url(generated_url):
+    """Return a valid image URL or a default placeholder."""
+    if is_valid_url(generated_url):
+        return generated_url
+    else:
+        return "https://via.placeholder.com/800x600"  # Fallback placeholder image    
+    
+def is_valid_url(url):
+    """Check if the URL is valid and returns an image."""
+    try:
+        response = requests.head(url, allow_redirects=True)
+        content_type = response.headers.get('content-type')
+        return response.status_code == 200 and 'image' in content_type
+    except requests.RequestException:
+        return False
+
+
+
 
 def generate_website_code(conversation_history, company_name, industry, primary_color, api_key):
     """Generate website HTML code based on conversation history."""
@@ -136,7 +157,8 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     
     if response:
         logging.info(f"API 응답 길이: {len(response)}")
-        return clean_html(response)
+        cleaned_html = clean_html(response)
+        return validate_image_urls(cleaned_html)
     
     return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
 
@@ -152,6 +174,18 @@ def clean_html(html):
     if not html.strip().startswith('<!DOCTYPE html>') or not html.strip().endswith('</html>'):
         return None
     
+    return html
+def validate_image_urls(html):
+    """Validate image URLs in HTML and replace invalid ones."""
+    # Use regular expression to find all img tags and extract URLs
+    img_pattern = re.compile(r'<img\s+[^>]*src="([^"]+)"')
+    matches = img_pattern.findall(html)
+
+    # Replace invalid URLs with placeholders
+    for url in matches:
+        valid_url = get_image_url(url)
+        html = html.replace(url, valid_url)
+
     return html
 
 # Streamlit UI
