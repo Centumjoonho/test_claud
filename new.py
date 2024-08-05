@@ -44,7 +44,7 @@ def generate_response(prompt, api_key):
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
-def search_unsplash_images(query):
+def search_unsplash_images(query, count=1):
     """Search Unsplash for images based on a query."""
     url = f"https://api.unsplash.com/search/photos"
     headers = {
@@ -52,13 +52,21 @@ def search_unsplash_images(query):
     }
     params = {
         "query": query,
-        "per_page": 4
+        "per_page": count
     }
-    response = requests.get(url, headers=headers, params=params)
-    data = response.json()
-    if data['results']:
-        return data['results'][0]['urls']['regular']
-    return ["https://via.placeholder.com/800x600"] * 4 # Fallback placeholder image
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()  # Raise an error for bad responses
+        data = response.json()
+        if 'results' in data and data['results']:
+            return [result['urls']['regular'] for result in data['results']]
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Unsplash API 요청 중 오류가 발생했습니다: {str(e)}")
+    except ValueError as e:
+        logging.error(f"JSON 해석 중 오류가 발생했습니다: {str(e)}")
+    
+    return ["https://via.placeholder.com/800x600"] * count  # Fallback placeholder images
+
 
 def get_image_url(query):
     """Get a valid image URL from Unsplash or a placeholder."""
@@ -76,10 +84,15 @@ def is_valid_url(url):
 def generate_website_code(conversation_history, company_name, industry, primary_color, api_key):
     """Generate website HTML code based on conversation history."""
     
-    # Fetch images using Unsplash API
-    hero_image_url = get_image_url(f"{industry},technology,innovation")
-    product_image_url = get_image_url(f"{industry},design")
-    about_image_url = get_image_url("teamwork,values")
+    # Fetch images using Unsplash API for different products
+    hero_image_url = search_unsplash_images(f"{industry},technology,innovation", 1)[0]
+    product_image_urls = search_unsplash_images(f"{industry},product,innovation", 4)
+    about_image_url = search_unsplash_images("teamwork,values", 1)[0]
+
+    # Ensure we have enough images to replace placeholders
+    if len(product_image_urls) < 4:
+        product_image_urls.extend(["https://via.placeholder.com/800x600"] * (4 - len(product_image_urls)))
+
 
     prompt = f"""숙련된 웹 개발자이자 디자이너로서, 다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
 
@@ -172,7 +185,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     if response:
         logging.info(f"API 응답 길이: {len(response)}")
         cleaned_html = clean_html(response)
-        return validate_image_urls(cleaned_html)
+        return validate_image_urls(cleaned_html, product_image_urls)
     
     return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
 
@@ -190,17 +203,17 @@ def clean_html(html):
     
     return html
 
-def validate_image_urls(html):
-    """Validate image URLs in HTML and replace invalid ones."""
+def validate_image_urls(html, product_image_urls):
+    """Replace placeholders in HTML with actual image URLs."""
     # Use regular expression to find all img tags and extract URLs
     img_pattern = re.compile(r'<img\s+[^>]*src="([^"]+)"')
     matches = img_pattern.findall(html)
 
     # Replace invalid URLs with Unsplash image URLs
-    for url in matches:
-        if not is_valid_url(url):
-            valid_url = get_image_url(url)
-            html = html.replace(url, valid_url)
+    for i, url in enumerate(matches):
+        if not is_valid_url(url) and i < len(product_image_urls):
+            valid_url = product_image_urls[i]
+            html = html.replace(url, valid_url, 1)  # Replace one occurrence at a time
 
     return html
 
