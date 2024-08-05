@@ -20,7 +20,7 @@ if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
 
 # Unsplash API 키를 하드코딩
-UNSPLASH_CLIENT_ID = "YOUR_UNSPLASH_ACCESS_KEY"  # 여기에 실제 Unsplash API 키를 입력하세요
+UNSPLASH_CLIENT_ID = "AUo2EDi70vyR0pB5floEOnNAKq0SQjhvJFto0150dRM"  # 여기에 실제 Unsplash API 키를 입력하세요
 
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
@@ -44,7 +44,7 @@ def generate_response(prompt, api_key):
         st.error(f"API 호출 중 오류가 발생했습니다: {str(e)}")
         return None
 
-def search_unsplash_images(query, count=1):
+def search_unsplash_images(query):
     """Search Unsplash for images based on a query."""
     url = f"https://api.unsplash.com/search/photos"
     headers = {
@@ -52,28 +52,34 @@ def search_unsplash_images(query, count=1):
     }
     params = {
         "query": query,
-        "per_page": count
+        "per_page": 4
     }
+    response = requests.get(url, headers=headers, params=params)
+    data = response.json()
+    if data['results']:
+        return data['results'][0]['urls']['regular']
+    return ["https://via.placeholder.com/800x600"] * 4 # Fallback placeholder image
+
+def get_image_url(query):
+    """Get a valid image URL from Unsplash or a placeholder."""
+    return search_unsplash_images(query)
+
+def is_valid_url(url):
+    """Check if the URL is valid and returns an image."""
     try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()  # Raise an error for bad responses
-        data = response.json()
-        if 'results' in data and data['results']:
-            return [result['urls']['regular'] for result in data['results']]
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Unsplash API 요청 중 오류가 발생했습니다: {str(e)}")
-    except ValueError as e:
-        logging.error(f"JSON 해석 중 오류가 발생했습니다: {str(e)}")
-    
-    return ["https://via.placeholder.com/800x600"] * count  # Fallback placeholder images
+        response = requests.head(url, allow_redirects=True)
+        content_type = response.headers.get('content-type')
+        return response.status_code == 200 and 'image' in content_type
+    except requests.RequestException:
+        return False
 
 def generate_website_code(conversation_history, company_name, industry, primary_color, api_key):
     """Generate website HTML code based on conversation history."""
     
-    # Fetch images using Unsplash API for different products
-    hero_image_url = search_unsplash_images(f"{industry},technology,innovation", 1)[0]
-    product_image_urls = search_unsplash_images(f"{industry},product,innovation", 4)
-    about_image_url = search_unsplash_images("teamwork,values", 1)[0]
+    # Fetch images using Unsplash API
+    hero_image_url = get_image_url(f"{industry},technology,innovation")
+    product_image_url = get_image_url(f"{industry},design")
+    about_image_url = get_image_url("teamwork,values")
 
     prompt = f"""숙련된 웹 개발자이자 디자이너로서, 다음 정보를 바탕으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
 
@@ -101,7 +107,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
                 - 슬로건: "{company_name} - {industry}의 혁신적인 솔루션"
                 - 1-2문장의 간단한 회사 소개 포함
             d. 제품/서비스 카드:
-                - 각 제품/서비스를 대표하는 이미지 사용: {product_image_urls}
+                - 각 제품/서비스를 대표하는 이미지 사용: {product_image_url}
                 - 구체적인 제품/서비스명과 2-3문장의 설명 제공
             e. 회사 소개 섹션:
                 - 팀워크 또는 회사 가치를 나타내는 이미지 사용: {about_image_url}
@@ -166,7 +172,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     if response:
         logging.info(f"API 응답 길이: {len(response)}")
         cleaned_html = clean_html(response)
-        return validate_image_urls(cleaned_html, product_image_urls)
+        return validate_image_urls(cleaned_html)
     
     return '<!-- 웹사이트 코드를 생성할 수 없습니다 -->'
 
@@ -176,7 +182,7 @@ def clean_html(html):
     html = re.sub(r'^.*?<!DOCTYPE html>', '<!DOCTYPE html>', html, flags=re.DOTALL)
     
     # Remove any content after closing </html> tag
-    html = re.sub(r'</html>.*$', '</html>', flags=re.DOTALL)
+    html = re.sub(r'</html>.*$', '</html>', html, flags=re.DOTALL)
     
     # Ensure the HTML structure is complete
     if not html.strip().startswith('<!DOCTYPE html>') or not html.strip().endswith('</html>'):
@@ -184,28 +190,19 @@ def clean_html(html):
     
     return html
 
-def validate_image_urls(html, product_image_urls):
-    """Replace placeholders in HTML with actual image URLs."""
+def validate_image_urls(html):
+    """Validate image URLs in HTML and replace invalid ones."""
     # Use regular expression to find all img tags and extract URLs
     img_pattern = re.compile(r'<img\s+[^>]*src="([^"]+)"')
     matches = img_pattern.findall(html)
 
     # Replace invalid URLs with Unsplash image URLs
-    for i, url in enumerate(matches):
-        if not is_valid_url(url) and i < len(product_image_urls):
-            valid_url = product_image_urls[i]
+    for url in matches:
+        if not is_valid_url(url):
+            valid_url = get_image_url(url)
             html = html.replace(url, valid_url)
 
     return html
-
-def is_valid_url(url):
-    """Check if the URL is valid and returns an image."""
-    try:
-        response = requests.head(url, allow_redirects=True)
-        content_type = response.headers.get('content-type')
-        return response.status_code == 200 and 'image' in content_type
-    except requests.RequestException:
-        return False
 
 # Streamlit UI
 st.set_page_config(layout="wide")
