@@ -54,10 +54,17 @@ def search_unsplash_images(query, count=1):
         "query": query,
         "per_page": count
     }
-    response = requests.get(url, headers=headers, params=params)
-    data = response.json()
-    if data['results']:
-        return [result['urls']['regular'] for result in data['results']]
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()  # Raise an error for bad responses
+        data = response.json()
+        if 'results' in data and data['results']:
+            return [result['urls']['regular'] for result in data['results']]
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Unsplash API 요청 중 오류가 발생했습니다: {str(e)}")
+    except ValueError as e:
+        logging.error(f"JSON 해석 중 오류가 발생했습니다: {str(e)}")
+    
     return ["https://via.placeholder.com/800x600"] * count  # Fallback placeholder images
 
 def generate_website_code(conversation_history, company_name, industry, primary_color, api_key):
@@ -169,7 +176,7 @@ def clean_html(html):
     html = re.sub(r'^.*?<!DOCTYPE html>', '<!DOCTYPE html>', html, flags=re.DOTALL)
     
     # Remove any content after closing </html> tag
-    html = re.sub(r'</html>.*$', '</html>', html, flags=re.DOTALL)
+    html = re.sub(r'</html>.*$', '</html>', flags=re.DOTALL)
     
     # Ensure the HTML structure is complete
     if not html.strip().startswith('<!DOCTYPE html>') or not html.strip().endswith('</html>'):
@@ -190,6 +197,15 @@ def validate_image_urls(html, product_image_urls):
             html = html.replace(url, valid_url)
 
     return html
+
+def is_valid_url(url):
+    """Check if the URL is valid and returns an image."""
+    try:
+        response = requests.head(url, allow_redirects=True)
+        content_type = response.headers.get('content-type')
+        return response.status_code == 200 and 'image' in content_type
+    except requests.RequestException:
+        return False
 
 # Streamlit UI
 st.set_page_config(layout="wide")
