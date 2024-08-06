@@ -29,7 +29,7 @@ def generate_response(prompt, api_key):
     """Generate a response using OpenAI API."""
     try:
         client = init_openai_client(api_key)
-        max_tokens = 16384 
+        max_tokens = 17384 
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -87,7 +87,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     
     # Fetch images using Unsplash API for different products
     hero_image_url = search_unsplash_images("tech company headquarters, modern office", 1)[0]
-    product_image_urls = search_unsplash_images("innovative technology, cutting-edge products", 4)
+    product_image_urls = search_unsplash_images(f"innovative {industry}, cutting-edge products", 4)
     about_image_url = search_unsplash_images("professional team meeting, tech workspace", 1)[0]
     # Ensure we have enough images to replace placeholders
     if len(product_image_urls) < 4:
@@ -104,13 +104,40 @@ def generate_website_code(conversation_history, company_name, industry, primary_
             완전한 HTML5 구조의 단일 페이지 웹사이트를 생성해주세요. 다음 요구사항을 반드시 포함하여 구현해주세요:
 
             1. 레이아웃 구조:
-            a. 반응형 네비게이션 바: 로고, 메뉴 항목 (Home, Products, About Us, Blog, Contact)
+            a. 반응형 네비게이션 바: 로고, 메뉴 항목 (회사소개, 사업영역, 상시채용, 소식, CONTACT) 
             b. 히어로 섹션: 전체 화면 배경 이미지, 회사 슬로건, 눈에 띄는 CTA 버튼
             c. 제품/서비스 하이라이트: 3-4개의 주요 제품/서비스를 카드 형식으로 표시
             d. 회사 소개: 이미지와 텍스트를 사용한 간략한 소개
-            e. 고객 후기 섹션
-            f. 뉴스레터 구독 양식
+            e. 고객 후기 섹션 - 규격화된 깔끔한 디자인
+            f. 뉴스레터 구독 양식 - 규격화된 깔끔한 디자인
             g. 푸터: 회사 정보, 빠른 링크, 소셜 미디어 아이콘
+            h. 레이아웃 비율 
+              
+                헤더 (10%):
+                
+                로고, 네비게이션 메뉴, 검색 바 등을 포함합니다.
+                사용자가 쉽게 웹사이트를 탐색할 수 있도록 돕습니다.
+                
+                히어로 섹션 (30%):
+
+                웹사이트의 주요 메시지나 핵심 제안을 포함합니다.
+                방문자의 주의를 끌고 첫인상을 결정짓는 중요한 역할을 합니다.
+
+
+                메인 콘텐츠 (40%):
+
+                웹사이트의 핵심 정보나 서비스를 소개합니다.
+                제품 리스트, 주요 특징, 블로그 포스트 등이 여기에 포함될 수 있습니다.
+
+
+                추가 섹션 (15%):
+
+                고객 후기, 파트너사 로고, 뉴스레터 구독 양식 등 보조적인 정보를 제공합니다.
+
+
+                푸터 (5%):
+
+                저작권 정보, 소셜 미디어 링크, 연락처 정보 등을 포함합니다.
 
             2. 이미지 및 콘텐츠:
             a. 모든 이미지에 실제 Unsplash URL을 사용하세요. 
