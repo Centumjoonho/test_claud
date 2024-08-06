@@ -136,7 +136,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     c. 히어로 구역과 버튼에 그라데이션 적용 (색상 코드 제시)
     d. 카드와 버튼에 그림자 효과 (구체적 수치 제시)
     e. 버튼과 카드에 호버 효과 (구체적 설명)
-    f. Font Awesome 아이콘 활용 (구체적 코드 제시)
+    f. Font Awesome 아이콘 활용 하여 페이지 적절한 곳에 특징적인 아이콘 표시 
     g. Scrolling Animation 효과 활용 (구체적 코드 제시)
     h. 헤더, 히어로, 메인 내용, 추가 구역, 푸터 디자인을 주 색상을 활용하여 디자인 하고 사용되는 텍스트의 색상은 주색상에 대비되어 잘 보이는 색상으로 선택
 
