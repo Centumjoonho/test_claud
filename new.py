@@ -86,10 +86,9 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     """Generate website HTML code based on conversation history."""
     
     # Fetch images using Unsplash API for different products
-    hero_image_url = search_unsplash_images(f"{industry},technology,innovation", 1)[0]
-    product_image_urls = search_unsplash_images(f"{industry},product,innovation", 4)
-    about_image_url = search_unsplash_images("teamwork,values", 1)[0]
-
+    hero_image_url = search_unsplash_images("tech company headquarters, modern office", 1)[0]
+    product_image_urls = search_unsplash_images("innovative technology, cutting-edge products", 4)
+    about_image_url = search_unsplash_images("professional team meeting, tech workspace", 1)[0]
     # Ensure we have enough images to replace placeholders
     if len(product_image_urls) < 4:
         product_image_urls.extend(["https://via.placeholder.com/800x600"] * (4 - len(product_image_urls)))
