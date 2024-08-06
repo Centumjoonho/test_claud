@@ -34,6 +34,7 @@ def generate_response(prompt, api_key):
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             # model="ft:gpt-3.5-turbo-1106:personal:jyweb10opts2:9stXUoA9",
+            # gpt-4o- FinTuning 은 구독 날짜로 14일 이후에 가능  - MaxToken 이슈가 있음
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
@@ -137,6 +138,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     e. 버튼과 카드에 호버 효과 (구체적 설명)
     f. Font Awesome 아이콘 활용 (구체적 코드 제시)
     g. Scrolling Animation 효과 활용 (구체적 코드 제시)
+    h. 헤더, 히어로, 메인 내용, 추가 구역, 푸터 디자인을 주 색상을 활용하여 디자인 하고 사용되는 텍스트의 색상은 주색상에 대비되어 잘 보이는 색상으로 선택
 
     4. 글꼴:
     a. 제목용 'Roboto', 본문용 'Open Sans' 사용 (굵기 명시)
