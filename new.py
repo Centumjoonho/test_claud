@@ -29,7 +29,9 @@ def generate_response(prompt, api_key):
     """Generate a response using OpenAI API."""
     try:
         client = init_openai_client(api_key)
-        max_tokens = 16384 
+        # max_tokens = 16384 
+        max_tokens = 6384 
+
 
         response = client.chat.completions.create(
             # model="gpt-4o-mini",
