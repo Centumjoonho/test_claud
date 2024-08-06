@@ -104,7 +104,7 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     HTML5 구조의 단일 페이지 웹사이트를 다음 요구사항에 맞춰 만들어주세요:
 
     1. 구조:
-    a. 반응형 네비게이션 바: 로고, 메뉴 항목 (회사소개, 사업영역, 채용, 소식, 연락처)
+    a. 반응형 네비게이션 바: 로고, 메뉴 항목 (회사소개, 사업영역, 상시채용, 회사소식, CONTACT)
     b. 히어로 구역: 전체 화면 배경 이미지, 회사 슬로건, CTA 버튼
     c. 제품/서비스 소개: 3-4개 주요 항목을 카드 형식으로 표시
     d. 회사 소개: 이미지와 텍스트로 간단히 소개
@@ -131,11 +131,12 @@ def generate_website_code(conversation_history, company_name, industry, primary_
 
     3. 디자인:
     a. 주 색상 {primary_color} 사용, 보조 색상 제안
-    b. 현대적 디자인, 여백 활용 (구체적 수치 제시)
+    b. 최신의 트렌디한 디자인, 여백 활용 (구체적 수치 제시)
     c. 히어로 구역과 버튼에 그라데이션 적용 (색상 코드 제시)
     d. 카드와 버튼에 그림자 효과 (구체적 수치 제시)
     e. 버튼과 카드에 호버 효과 (구체적 설명)
     f. Font Awesome 아이콘 활용 (구체적 코드 제시)
+    g. Scrolling Animation 효과 활용 (구체적 코드 제시)
 
     4. 글꼴:
     a. 제목용 'Roboto', 본문용 'Open Sans' 사용 (굵기 명시)
