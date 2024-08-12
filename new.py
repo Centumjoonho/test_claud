@@ -1,4 +1,5 @@
 import logging
+import time
 import streamlit as st
 from openai import OpenAI
 import re
@@ -304,24 +305,36 @@ def deploy_to_netlify(html_content, site_name, custom_subdomain=None):
 
             logging.info(f"Netlify 배포 시작: {site_name}")
             
-            deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
-            with open(zip_path, 'rb') as zip_file:
-                response = requests.post(deploy_url, headers=headers, data=zip_file)
-            response.raise_for_status()
-            
-            deploy_url = response.json()['deploy_ssl_url']
-            if custom_subdomain:
-                custom_domain = f"{custom_subdomain}.netlify.app"
-                update_url = f"{netlify_api_url}/sites/{site_id}"
-                update_response = requests.patch(update_url, headers=headers, json={"custom_domain": custom_domain})
-                if update_response.status_code == 200:
-                    logging.info(f"사용자 지정 서브도메인 {custom_domain} 설정 완료")
-                    deploy_url = f"https://{custom_domain}"
-                else:
-                    logging.warning(f"사용자 지정 서브도메인 설정 실패: {update_response.text}")
-                    
-            logging.info(f"배포 성공: {deploy_url}")
-            return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
+        # 배포
+        deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
+        with open(zip_path, 'rb') as zip_file:
+            response = requests.post(deploy_url, headers=headers, data=zip_file)
+        response.raise_for_status()
+        
+        deploy_url = response.json()['deploy_ssl_url']
+        
+        # 사용자 지정 서브도메인 설정
+        if custom_subdomain:
+            custom_domain = f"{custom_subdomain}.netlify.app"
+            update_url = f"{netlify_api_url}/sites/{site_id}"
+            update_response = requests.patch(update_url, headers=headers, json={"custom_domain": custom_domain})
+            if update_response.status_code == 200:
+                logging.info(f"사용자 지정 서브도메인 {custom_domain} 설정 완료")
+                # 도메인 설정 후 DNS 전파를 기다립니다
+                time.sleep(10)  # DNS 전파를 위해 10초 대기
+                deploy_url = f"https://{custom_domain}"
+            else:
+                logging.warning(f"사용자 지정 서브도메인 설정 실패: {update_response.text}")
+                st.warning(f"사용자 지정 서브도메인 설정에 실패했습니다. 기본 URL을 사용합니다.")
+        
+        # 최종 URL 확인
+        site_info_url = f"{netlify_api_url}/sites/{site_id}"
+        site_info_response = requests.get(site_info_url, headers=headers)
+        site_info_response.raise_for_status()
+        final_url = site_info_response.json().get('url', deploy_url)
+        
+        logging.info(f"배포 성공: {final_url}")
+        return f"웹사이트가 성공적으로 배포되었습니다. URL: {final_url}"
 
     except requests.exceptions.RequestException as e:
         logging.error(f"Netlify API 요청 중 오류 발생: {str(e)}")
@@ -411,8 +424,10 @@ if st.session_state.api_key:
             if st.session_state.website_code.strip().endswith("</html>"):
                 if st.button("웹페이지 배포하기"):
                     site_name = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
-                    deploy_result = deploy_to_netlify(st.session_state.website_code, site_name, custom_subdomain)
-                    st.write(deploy_result)
+                    with st.spinner("웹사이트 배포 중..."):
+                        deploy_result = deploy_to_netlify(st.session_state.website_code, site_name, custom_subdomain)
+                    st.success(deploy_result)
+                    st.info("참고: 사용자 지정 도메인 설정은 몇 분 정도 소요될 수 있습니다.")
             else:
                 st.warning("HTML 코드가 완전히 생성되지 않았습니다. 코드 생성이 완료되면 배포 버튼이 나타납니다.")
         else:
