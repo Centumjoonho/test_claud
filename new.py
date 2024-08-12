@@ -260,8 +260,8 @@ def deploy_to_netlify(html_content, site_name):
     # ZIP 파일 생성
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr('index.html', html_content)
-        zip_file.writestr('netlify.toml', netlify_toml_content)
+        zip_file.writestr('index.html', html_content.encode('utf-8'))
+        zip_file.writestr('netlify.toml', netlify_toml_content.encode('utf-8'))
     
     zip_buffer.seek(0)
     
@@ -281,6 +281,9 @@ def deploy_to_netlify(html_content, site_name):
     deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
     files = {'file': ('site.zip', zip_buffer.getvalue())}
     response = requests.post(deploy_url, headers=headers, files=files)
+    
+    logging.info(f"Netlify API 응답 상태: {response.status_code}")
+    logging.info(f"Netlify API 응답 내용: {response.text}")
     
     if response.status_code == 200:
         deploy_url = response.json()['deploy_ssl_url']
