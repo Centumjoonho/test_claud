@@ -8,6 +8,7 @@ import requests
 import zipfile
 import os
 from html.parser import HTMLParser
+import tempfile
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -262,40 +263,50 @@ def deploy_to_netlify(html_content, site_name):
         "Content-Type": "application/zip"
     }
 
-
     try:
-        # ZIP 파일 생성
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            zip_file.writestr('index.html', html_content)
-        
-        zip_buffer.seek(0)
-        
-        # 사이트 생성 또는 기존 사이트 찾기
-        sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
-        sites_response.raise_for_status()
-        sites = sites_response.json()
-        site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
-        
-        if not site_id:
-            create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
-            create_site_response.raise_for_status()
-            site_id = create_site_response.json()['id']
+        # 임시 디렉토리 생성
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # index.html 파일 생성
+            index_path = os.path.join(tmp_dir, 'index.html')
+            with open(index_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            # ZIP 파일 생성
+            zip_path = os.path.join(tmp_dir, 'site.zip')
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                zip_file.write(index_path, 'index.html')
+            
+            # ZIP 파일 내용 확인
+            with zipfile.ZipFile(zip_path, 'r') as zip_file:
+                logging.info(f"ZIP 파일 내용: {zip_file.namelist()}")
+            
+            # 사이트 생성 또는 기존 사이트 찾기
+            sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
+            sites_response.raise_for_status()
+            sites = sites_response.json()
+            site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
+            
+            if not site_id:
+                create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
+                create_site_response.raise_for_status()
+                site_id = create_site_response.json()['id']
 
-        logging.info(f"Netlify 배포 시작: {site_name}")
-        
-        # 배포
-        deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
-        files = {'file': ('site.zip', zip_buffer.getvalue())}
-        response = requests.post(deploy_url, headers=headers, files=files)
-        response.raise_for_status()
-        
-        deploy_url = response.json()['deploy_ssl_url']
-        logging.info(f"배포 성공: {deploy_url}")
-        return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
+            logging.info(f"Netlify 배포 시작: {site_name}")
+            
+            # 배포
+            deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
+            with open(zip_path, 'rb') as zip_file:
+                response = requests.post(deploy_url, headers=headers, data=zip_file)
+            response.raise_for_status()
+            
+            deploy_url = response.json()['deploy_ssl_url']
+            logging.info(f"배포 성공: {deploy_url}")
+            return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
 
     except requests.exceptions.RequestException as e:
         logging.error(f"Netlify API 요청 중 오류 발생: {str(e)}")
+        if hasattr(e.response, 'text'):
+            logging.error(f"응답 내용: {e.response.text}")
         return f"배포 중 오류가 발생했습니다: {str(e)}"
     except Exception as e:
         logging.error(f"예기치 않은 오류 발생: {str(e)}")
