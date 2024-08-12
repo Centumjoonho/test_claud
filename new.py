@@ -2,10 +2,12 @@ import logging
 import streamlit as st
 from openai import OpenAI
 import re
-import requests
 import base64
 import io
+import requests
 import zipfile
+import os
+from html.parser import HTMLParser
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -239,6 +241,20 @@ def validate_image_urls(html, product_image_urls):
 
     return html
 
+class HTMLValidator(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.errors = []
+
+    def error(self, message):
+        self.errors.append(message)
+        
+        
+def validate_html(html_content):
+    validator = HTMLValidator()
+    validator.feed(html_content)
+    return validator.errors
+
 def deploy_to_netlify(html_content, site_name):
     netlify_api_url = "https://api.netlify.com/api/v1"
     headers = {
@@ -246,37 +262,60 @@ def deploy_to_netlify(html_content, site_name):
         "Content-Type": "application/zip"
     }
 
-    # ZIP 파일 생성
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr('index.html', html_content)
-    
-    zip_buffer.seek(0)
-    
-    # 사이트 생성 또는 기존 사이트 찾기
-    sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
-    sites = sites_response.json()
-    site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
-    
-    if not site_id:
-        create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
-        site_id = create_site_response.json()['id']
-# 함수 시작 부분에 로깅 추가
-    logging.info(f"Netlify 배포 시작: {site_name}")
-    # 배포
-    deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
-    files = {'file': ('site.zip', zip_buffer.getvalue())}
-    response = requests.post(deploy_url, headers=headers, files=files)
-    
-    if response.status_code == 200:
-        deploy_url = response.json()['deploy_ssl_url']
-        logging.info(f"배포 성공: {deploy_url}")
-        return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
-    else:
-        logging.error(f"배포 실패: {response.text}")
-        return f"배포 중 오류가 발생했습니다: {response.text}"
-    
-    
+    netlify_toml_content = """
+[build]
+  publish = "/"
+  command = ""
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+"""
+
+    try:
+        with io.BytesIO() as zip_buffer:
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                zip_file.writestr('index.html', html_content)
+                zip_file.writestr('netlify.toml', netlify_toml_content)
+
+            zip_buffer.seek(0)
+            
+            logging.info(f"ZIP 파일 내용: {', '.join(zipfile.ZipFile(zip_buffer, 'r').namelist())}")
+            logging.info(f"생성된 ZIP 파일 크기: {zip_buffer.getbuffer().nbytes} bytes")
+
+            sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
+            sites_response.raise_for_status()
+            sites = sites_response.json()
+            site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
+
+            if not site_id:
+                create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
+                create_site_response.raise_for_status()
+                site_id = create_site_response.json()['id']
+
+            logging.info(f"Netlify 배포 시작: {site_name} (ID: {site_id})")
+
+            deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
+            files = {'file': ('site.zip', zip_buffer.getvalue())}
+            response = requests.post(deploy_url, headers=headers, files=files)
+            
+            logging.info(f"Netlify API 응답 상태 코드: {response.status_code}")
+            logging.info(f"Netlify API 응답 내용: {response.text}")
+            
+            response.raise_for_status()
+
+            deploy_url = response.json()['deploy_ssl_url']
+            logging.info(f"배포 성공: {deploy_url}")
+            return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Netlify API 요청 중 오류 발생: {str(e)}")
+        return f"배포 중 오류가 발생했습니다: {str(e)}"
+    except Exception as e:
+        logging.error(f"예기치 않은 오류 발생: {str(e)}")
+        return f"배포 중 오류가 발생했습니다: {str(e)}"
+
 # Streamlit UI
 st.set_page_config(layout="wide")
 st.title("AI 웹사이트 생성기 (OpenAI 버전)")
@@ -291,11 +330,6 @@ if api_key:
     except Exception as e:
         st.error(f"API 키가 유효하지 않습니다: {str(e)}")
         st.session_state.api_key = ""
-        
-# # Netlify 토큰 입력
-# netlify_token = st.text_input("Netlify API 토큰을 입력해주세요:", type="password", value=st.session_state.netlify_token)
-# if netlify_token:
-#     st.session_state.netlify_token = netlify_token
 
 if st.session_state.api_key:
     if not st.session_state.company_name or not st.session_state.industry:
@@ -350,6 +384,11 @@ if st.session_state.api_key:
     if st.session_state.website_code:
         with st.expander("생성된 HTML 코드 보기", expanded=False):
             st.code(st.session_state.website_code, language="html")
+        
+        # HTML 유효성 검사
+        errors = validate_html(st.session_state.website_code)
+        if errors:
+            st.warning(f"HTML 유효성 검사 오류: {errors}")
         
         if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
             st.subheader("웹사이트 미리보기")
