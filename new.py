@@ -24,8 +24,10 @@ if 'industry' not in st.session_state:
     st.session_state.industry = ""
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
-# if 'netlify_token' not in st.session_state:
-#     st.session_state.netlify_token = ""
+if 'deploying' not in st.session_state:
+    st.session_state.deploying = False
+if 'deploy_result' not in st.session_state:
+    st.session_state.deploy_result = None
 
 # Unsplash API 키를 하드코딩
 UNSPLASH_CLIENT_ID = "AUo2EDi70vyR0pB5floEOnNAKq0SQjhvJFto0150dRM"  # 여기에 실제 Unsplash API 키를 입력하세요
@@ -43,9 +45,9 @@ def generate_response(prompt, api_key):
         max_tokens = 16384 
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
             # model="ft:gpt-3.5-turbo-1106:personal:jyweb10opts2:9stXUoA9",
             # gpt-4o- FinTuning 은 구독 날짜로 14일 이후에 가능  - MaxToken 이슈가 있음
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
@@ -80,7 +82,6 @@ def search_unsplash_images(query, count=1):
     
     return ["https://via.placeholder.com/800x600"] * count  # Fallback placeholder images
 
-
 def get_image_url(query):
     """Get a valid image URL from Unsplash or a placeholder."""
     return search_unsplash_images(query)
@@ -104,7 +105,6 @@ def generate_website_code(conversation_history, company_name, industry, primary_
     # Ensure we have enough images to replace placeholders
     if len(product_image_urls) < 4:
         product_image_urls.extend(["https://via.placeholder.com/800x600"] * (4 - len(product_image_urls)))
-
 
     prompt = f"""웹 개발자와 디자이너로서, 아래 정보를 기반으로 현대적이고 전문적인 HTML 웹사이트를 만들어주세요:
 
@@ -197,11 +197,7 @@ HTML5 구조의 단일 페이지 웹사이트를 다음 요구사항에 맞춰 �
 
 페이지 로딩 속도, 웹 표준, 브라우저 호환성을 고려해 최적화해주세요. 코드에 주석을 달아 설명해주세요.
 
-{company_name}의 특성을 반영한 완전한 웹사이트 코드를 제공하고, 쉽게 수정할 수 있도록 변수나 클래스명을 직관적으로 작성해주세요.
-
-
-
-    """
+{company_name}의 특성을 반영한 완전한 웹사이트 코드를 제공하고, 쉽게 수정할 수 있도록 변수나 클래스명을 직관적으로 작성해주세요."""
     
     logging.info(f"프롬프트 내용: {prompt}")
     
@@ -249,7 +245,6 @@ class HTMLValidator(HTMLParser):
 
     def error(self, message):
         self.errors.append(message)
-        
         
 def validate_html(html_content):
     validator = HTMLValidator()
@@ -312,7 +307,7 @@ def deploy_to_netlify(html_content, site_name):
             # 배포
             deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
             with open(zip_path, 'rb') as zip_file:
-                response = requests.post(deploy_url, headers=headers, data=zip_file)
+                response = requests.post(deploy_url, headers=headers, files={'file': zip_file})
             response.raise_for_status()
             
             deploy_url = response.json()['deploy_ssl_url']
@@ -408,10 +403,19 @@ if st.session_state.api_key:
             
             # HTML 코드가 완전히 생성되었을 때만 Netlify 배포 버튼 표시
             if st.session_state.website_code.strip().endswith("</html>"):
+                site_name_input = st.text_input("사이트 이름을 입력하세요:", f"{st.session_state.company_name.lower().replace(' ', '-')}-site")
                 if st.button("Netlify에 배포하기"):
-                    site_name = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
-                    deploy_result = deploy_to_netlify(st.session_state.website_code, site_name)
-                    st.write(deploy_result)
+                    st.session_state.deploying = True
+                    with st.spinner("배포 중... 잠시만 기다려주세요."):
+                        deploy_result = deploy_to_netlify(st.session_state.website_code, site_name_input)
+                        st.session_state.deploy_result = deploy_result
+                    st.session_state.deploying = False
+
+                if st.session_state.deploy_result:
+                    st.success(st.session_state.deploy_result)
+                    deploy_url = st.session_state.deploy_result.split('URL: ')[-1]
+                    st.markdown(f"[배포된 웹사이트 열기]({deploy_url})")
+                    st.markdown(f"`{deploy_url}` [복사하기](#)", unsafe_allow_html=True)
             else:
                 st.warning("HTML 코드가 완전히 생성되지 않았습니다. 코드 생성이 완료되면 배포 버튼이 나타납니다.")
         else:
