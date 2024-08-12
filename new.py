@@ -256,7 +256,7 @@ def validate_html(html_content):
     validator.feed(html_content)
     return validator.errors
 
-def deploy_to_netlify(html_content, site_name):
+def deploy_to_netlify(html_content, site_name, custom_subdomain=None):
     netlify_api_url = "https://api.netlify.com/api/v1"
     headers = {
         "Authorization": f"Bearer {NETLIFY_TOKEN}",
