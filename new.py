@@ -245,11 +245,23 @@ def deploy_to_netlify(html_content, site_name):
         "Authorization": f"Bearer {NETLIFY_TOKEN}",
         "Content-Type": "application/zip"
     }
+   # netlify.toml 파일 내용
+    netlify_toml_content = """
+                            [build]
+                            publish = "/"
+                            command = "echo 'No build command'"
+
+                            [[redirects]]
+                            from = "/*"
+                            to = "/index.html"
+                            status = 200
+                          """
 
     # ZIP 파일 생성
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr('index.html', html_content)
+        zip_file.writestr('netlify.toml', netlify_toml_content)
     
     zip_buffer.seek(0)
     
