@@ -3,6 +3,9 @@ import streamlit as st
 from openai import OpenAI
 import re
 import requests
+import base64
+import io
+import zipfile
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -18,9 +21,13 @@ if 'industry' not in st.session_state:
     st.session_state.industry = ""
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
+# if 'netlify_token' not in st.session_state:
+#     st.session_state.netlify_token = ""
 
 # Unsplash API 키를 하드코딩
 UNSPLASH_CLIENT_ID = "AUo2EDi70vyR0pB5floEOnNAKq0SQjhvJFto0150dRM"  # 여기에 실제 Unsplash API 키를 입력하세요
+# Netlify API 토큰 하드 코딩
+NETLIFY_TOKEN = "nfp_4VYZWAKupMT3hroC9qVrqndCN1Q1oavy13e6"
 
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
@@ -232,6 +239,37 @@ def validate_image_urls(html, product_image_urls):
 
     return html
 
+def deploy_to_netlify(html_content, site_name):
+    netlify_api_url = "https://api.netlify.com/api/v1"
+    headers = {
+        "Authorization": f"Bearer {NETLIFY_TOKEN}",
+        "Content-Type": "application/zip"
+    }
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
+        zip_file.writestr('index.html', html_content)
+    
+    zip_buffer.seek(0)
+    
+    sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
+    sites = sites_response.json()
+    site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
+    
+    if not site_id:
+        create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
+        site_id = create_site_response.json()['id']
+
+    deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
+    response = requests.post(deploy_url, headers=headers, data=zip_buffer.getvalue())
+    
+    if response.status_code == 200:
+        deploy_url = response.json()['deploy_ssl_url']
+        return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
+    else:
+        return f"배포 중 오류가 발생했습니다: {response.text}"
+    
+    
 # Streamlit UI
 st.set_page_config(layout="wide")
 st.title("AI 웹사이트 생성기 (OpenAI 버전)")
@@ -246,6 +284,11 @@ if api_key:
     except Exception as e:
         st.error(f"API 키가 유효하지 않습니다: {str(e)}")
         st.session_state.api_key = ""
+        
+# # Netlify 토큰 입력
+# netlify_token = st.text_input("Netlify API 토큰을 입력해주세요:", type="password", value=st.session_state.netlify_token)
+# if netlify_token:
+#     st.session_state.netlify_token = netlify_token
 
 if st.session_state.api_key:
     if not st.session_state.company_name or not st.session_state.industry:
@@ -304,6 +347,11 @@ if st.session_state.api_key:
         if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
             st.subheader("웹사이트 미리보기")
             st.components.v1.html(st.session_state.website_code, height=1200, scrolling=True)
+            
+            if st.button("Netlify에 배포하기"):
+                site_name = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
+                deploy_result = deploy_to_netlify(st.session_state.website_code, site_name)
+                st.write(deploy_result)
         else:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
