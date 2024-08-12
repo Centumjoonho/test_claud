@@ -246,12 +246,14 @@ def deploy_to_netlify(html_content, site_name):
         "Content-Type": "application/zip"
     }
 
+    # ZIP 파일 생성
     zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr('index.html', html_content)
     
     zip_buffer.seek(0)
     
+    # 사이트 생성 또는 기존 사이트 찾기
     sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
     sites = sites_response.json()
     site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
@@ -259,14 +261,21 @@ def deploy_to_netlify(html_content, site_name):
     if not site_id:
         create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
         site_id = create_site_response.json()['id']
-
+    
+    #함수 시작 부분에 로깅 추가
+    logging.info(f"Netlify 배포 시작: {site_name}")
+    
+    # 배포
     deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
-    response = requests.post(deploy_url, headers=headers, data=zip_buffer.getvalue())
+    files = {'file': ('site.zip', zip_buffer.getvalue())}
+    response = requests.post(deploy_url, headers=headers, files=files)
     
     if response.status_code == 200:
         deploy_url = response.json()['deploy_ssl_url']
+        logging.info(f"배포 성공: {deploy_url}")
         return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
     else:
+        logging.error(f"배포 실패: {response.text}")
         return f"배포 중 오류가 발생했습니다: {response.text}"
     
     
