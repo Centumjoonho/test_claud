@@ -3,9 +3,9 @@ import streamlit as st
 from openai import OpenAI
 import re
 import requests
-import base64
-import io
+import os
 import zipfile
+import tempfile
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -256,43 +256,61 @@ def deploy_to_netlify(html_content, site_name):
                             to = "/index.html"
                             status = 200
                           """
+    try:
+        # 임시 디렉토리 생성
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            
+            # 파일 생성
+            index_path = os.path.join(tmpdirname, 'index.html')
+            toml_path = os.path.join(tmpdirname, 'netlify.toml')
+            zip_path = os.path.join(tmpdirname, 'site.zip')
 
-    # ZIP 파일 생성
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr('index.html', html_content.encode('utf-8'))
-        zip_file.writestr('netlify.toml', netlify_toml_content.encode('utf-8'))
-    
-    zip_buffer.seek(0)
-    
-    # 사이트 생성 또는 기존 사이트 찾기
-    sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
-    sites = sites_response.json()
-    site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
-    
-    if not site_id:
-        create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
-        site_id = create_site_response.json()['id']
-    
-    #함수 시작 부분에 로깅 추가
-    logging.info(f"Netlify 배포 시작: {site_name}")
-    
-    # 배포
-    deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
-    files = {'file': ('site.zip', zip_buffer.getvalue())}
-    response = requests.post(deploy_url, headers=headers, files=files)
-    
-    logging.info(f"Netlify API 응답 상태: {response.status_code}")
-    logging.info(f"Netlify API 응답 내용: {response.text}")
-    
-    if response.status_code == 200:
-        deploy_url = response.json()['deploy_ssl_url']
-        logging.info(f"배포 성공: {deploy_url}")
-        return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
-    else:
-        logging.error(f"배포 실패: {response.text}")
-        return f"배포 중 오류가 발생했습니다: {response.text}"
-    
+            with open(index_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            with open(toml_path, 'w', encoding='utf-8') as f:
+                f.write(netlify_toml_content)
+
+            # ZIP 파일 생성
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                zip_file.write(index_path, 'index.html')
+                zip_file.write(toml_path, 'netlify.toml')
+            
+            # ZIP 파일 내용 확인
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                logging.info(f"ZIP 파일 내용: {zip_ref.namelist()}")
+
+                
+            # 사이트 생성 또는 찾기
+            sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
+            sites_response.raise_for_status()
+            sites = sites_response.json()
+            site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
+
+            if not site_id:
+                create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
+                create_site_response.raise_for_status()
+                site_id = create_site_response.json()['id']
+
+            logging.info(f"Netlify 배포 시작: {site_name} (ID: {site_id})")
+        
+            # 배포
+            deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
+            with open(zip_path, 'rb') as zip_file:
+                files = {'file': ('site.zip', zip_file)}
+                response = requests.post(deploy_url, headers=headers, files=files)
+                response.raise_for_status()
+
+            deploy_url = response.json()['deploy_ssl_url']
+            logging.info(f"배포 성공: {deploy_url}")
+            return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Netlify API 요청 중 오류 발생: {str(e)}")
+        return f"배포 중 오류가 발생했습니다: {str(e)}"
+    except Exception as e:
+        logging.error(f"예기치 않은 오류 발생: {str(e)}")
+        return f"배포 중 오류가 발생했습니다: {str(e)}"
+
     
 # Streamlit UI
 st.set_page_config(layout="wide")
