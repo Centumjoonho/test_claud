@@ -245,22 +245,18 @@ def deploy_to_netlify(html_content, site_name):
         "Authorization": f"Bearer {NETLIFY_TOKEN}",
         "Content-Type": "application/zip"
     }
-   # netlify.toml 파일 내용
     netlify_toml_content = """
-                            [build]
-                            publish = "/"
-                            command = "echo 'No build command'"
+[build]
+  publish = "/"
+  command = ""
 
-                            [[redirects]]
-                            from = "/*"
-                            to = "/index.html"
-                            status = 200
-                          """
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+"""
     try:
-        # 임시 디렉토리 생성
         with tempfile.TemporaryDirectory() as tmpdirname:
-            
-            # 파일 생성
             index_path = os.path.join(tmpdirname, 'index.html')
             toml_path = os.path.join(tmpdirname, 'netlify.toml')
             zip_path = os.path.join(tmpdirname, 'site.zip')
@@ -270,17 +266,13 @@ def deploy_to_netlify(html_content, site_name):
             with open(toml_path, 'w', encoding='utf-8') as f:
                 f.write(netlify_toml_content)
 
-            # ZIP 파일 생성
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.write(index_path, 'index.html')
                 zip_file.write(toml_path, 'netlify.toml')
-            
-            # ZIP 파일 내용 확인
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                logging.info(f"ZIP 파일 내용: {zip_ref.namelist()}")
 
-                
-            # 사이트 생성 또는 찾기
+            logging.info(f"ZIP 파일 내용: {', '.join(zipfile.ZipFile(zip_path, 'r').namelist())}")
+            logging.info(f"생성된 ZIP 파일 크기: {os.path.getsize(zip_path)} bytes")
+
             sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
             sites_response.raise_for_status()
             sites = sites_response.json()
@@ -292,8 +284,7 @@ def deploy_to_netlify(html_content, site_name):
                 site_id = create_site_response.json()['id']
 
             logging.info(f"Netlify 배포 시작: {site_name} (ID: {site_id})")
-        
-            # 배포
+
             deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
             with open(zip_path, 'rb') as zip_file:
                 files = {'file': ('site.zip', zip_file)}
