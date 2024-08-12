@@ -265,17 +265,14 @@ def deploy_to_netlify(html_content, site_name, custom_subdomain=None):
 
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            # index.html 파일 생성
             index_path = os.path.join(tmp_dir, 'index.html')
             with open(index_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             
-            # _redirects 파일 생성
             redirects_path = os.path.join(tmp_dir, '_redirects')
             with open(redirects_path, 'w') as f:
                 f.write("/* /index.html 200")
             
-            # netlify.toml 파일 생성
             toml_path = os.path.join(tmp_dir, 'netlify.toml')
             with open(toml_path, 'w') as f:
                 f.write("""
@@ -289,14 +286,12 @@ def deploy_to_netlify(html_content, site_name, custom_subdomain=None):
                             Content-Type = "text/html; charset=UTF-8"
                         """)
             
-            # ZIP 파일 생성
             zip_path = os.path.join(tmp_dir, 'site.zip')
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.write(index_path, 'index.html')
                 zip_file.write(redirects_path, '_redirects')
                 zip_file.write(toml_path, 'netlify.toml')
             
-            # 사이트 생성 또는 기존 사이트 찾기
             sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
             sites_response.raise_for_status()
             sites = sites_response.json()
@@ -309,14 +304,12 @@ def deploy_to_netlify(html_content, site_name, custom_subdomain=None):
 
             logging.info(f"Netlify 배포 시작: {site_name}")
             
-            # 배포
             deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
             with open(zip_path, 'rb') as zip_file:
                 response = requests.post(deploy_url, headers=headers, data=zip_file)
             response.raise_for_status()
             
             deploy_url = response.json()['deploy_ssl_url']
-           # 사용자 지정 서브도메인 설정
             if custom_subdomain:
                 custom_domain = f"{custom_subdomain}.netlify.app"
                 update_url = f"{netlify_api_url}/sites/{site_id}"
@@ -327,7 +320,6 @@ def deploy_to_netlify(html_content, site_name, custom_subdomain=None):
                 else:
                     logging.warning(f"사용자 지정 서브도메인 설정 실패: {update_response.text}")
                     
-                             
             logging.info(f"배포 성공: {deploy_url}")
             return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
 
@@ -344,7 +336,6 @@ def deploy_to_netlify(html_content, site_name, custom_subdomain=None):
 st.set_page_config(layout="wide")
 st.title("AI 웹사이트 생성기 (OpenAI 버전)")
 
-# API 키 입력
 api_key = st.text_input("OpenAI API 키를 입력해주세요:", type="password", value=st.session_state.api_key)
 if api_key:
     st.session_state.api_key = api_key
@@ -370,11 +361,9 @@ if st.session_state.api_key:
                 "content": f"새로운 대화가 {industry} 산업의 {company_name}에 대해 시작되었습니다."
             })
             
-    # 현재 설정된 정보 표시
     st.sidebar.write(f"회사명: {st.session_state.get('company_name', '미설정')}")
     st.sidebar.write(f"업종: {st.session_state.get('industry', '미설정')}")
 
-    # 색상 변경 옵션
     new_color = st.sidebar.color_picker("주 색상 변경", st.session_state.get('primary_color', '#000000'))
     if new_color != st.session_state.get('primary_color'):
         st.session_state.primary_color = new_color
@@ -394,7 +383,6 @@ if st.session_state.api_key:
         if response:
             st.session_state.messages.append({"role": "assistant", "content": response})
         
-        # 대화 내용을 바탕으로 웹사이트 코드 생성 또는 업데이트
         conversation_history = "\n".join([m["content"] for m in st.session_state.messages if m["role"] != "system"])
         st.session_state.website_code = generate_website_code(
             conversation_history, 
@@ -403,17 +391,15 @@ if st.session_state.api_key:
             st.session_state.primary_color,
             st.session_state.api_key
         )
-    # 사용자 지정 서브도메인 입력 필드 추가
+
     custom_subdomain = st.text_input("사용자 지정 서브도메인 (선택사항, 예: mycompany):")
     if custom_subdomain:
         st.info(f"설정된 도메인: {custom_subdomain}.netlify.app")
     
-    # 생성된 코드 표시
     if st.session_state.website_code:
         with st.expander("생성된 HTML 코드 보기", expanded=False):
             st.code(st.session_state.website_code, language="html")
         
-        # HTML 유효성 검사
         errors = validate_html(st.session_state.website_code)
         if errors:
             st.warning(f"HTML 유효성 검사 오류: {errors}")
@@ -422,9 +408,8 @@ if st.session_state.api_key:
             st.subheader("웹사이트 미리보기")
             st.components.v1.html(st.session_state.website_code, height=1200, scrolling=True)
             
-            # HTML 코드가 완전히 생성되었을 때만 Netlify 배포 버튼 표시
             if st.session_state.website_code.strip().endswith("</html>"):
-                if st.button("Netlify에 배포하기"):
+                if st.button("웹페이지 배포하기"):
                     site_name = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
                     deploy_result = deploy_to_netlify(st.session_state.website_code, site_name, custom_subdomain)
                     st.write(deploy_result)
