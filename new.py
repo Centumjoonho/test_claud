@@ -264,21 +264,37 @@ def deploy_to_netlify(html_content, site_name):
     }
 
     try:
-        # 임시 디렉토리 생성
         with tempfile.TemporaryDirectory() as tmp_dir:
             # index.html 파일 생성
             index_path = os.path.join(tmp_dir, 'index.html')
             with open(index_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             
+            # _redirects 파일 생성
+            redirects_path = os.path.join(tmp_dir, '_redirects')
+            with open(redirects_path, 'w') as f:
+                f.write("/* /index.html 200")
+            
+            # netlify.toml 파일 생성
+            toml_path = os.path.join(tmp_dir, 'netlify.toml')
+            with open(toml_path, 'w') as f:
+                f.write("""
+[build]
+  publish = "."
+  command = "echo 'No build command'"
+
+[[headers]]
+  for = "/*"
+    [headers.values]
+    Content-Type = "text/html; charset=UTF-8"
+""")
+            
             # ZIP 파일 생성
             zip_path = os.path.join(tmp_dir, 'site.zip')
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.write(index_path, 'index.html')
-            
-            # ZIP 파일 내용 확인
-            with zipfile.ZipFile(zip_path, 'r') as zip_file:
-                logging.info(f"ZIP 파일 내용: {zip_file.namelist()}")
+                zip_file.write(redirects_path, '_redirects')
+                zip_file.write(toml_path, 'netlify.toml')
             
             # 사이트 생성 또는 기존 사이트 찾기
             sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
