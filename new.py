@@ -279,15 +279,15 @@ def deploy_to_netlify(html_content, site_name):
             toml_path = os.path.join(tmp_dir, 'netlify.toml')
             with open(toml_path, 'w') as f:
                 f.write("""
-[build]
-  publish = "."
-  command = "echo 'No build command'"
+                        [build]
+                        publish = "."
+                        command = "echo 'No build command'"
 
-[[headers]]
-  for = "/*"
-    [headers.values]
-    Content-Type = "text/html; charset=UTF-8"
-""")
+                        [[headers]]
+                        for = "/*"
+                            [headers.values]
+                            Content-Type = "text/html; charset=UTF-8"
+                        """)
             
             # ZIP 파일 생성
             zip_path = os.path.join(tmp_dir, 'site.zip')
@@ -316,6 +316,18 @@ def deploy_to_netlify(html_content, site_name):
             response.raise_for_status()
             
             deploy_url = response.json()['deploy_ssl_url']
+           # 사용자 지정 서브도메인 설정
+            if custom_subdomain:
+                custom_domain = f"{custom_subdomain}.netlify.app"
+                update_url = f"{netlify_api_url}/sites/{site_id}"
+                update_response = requests.patch(update_url, headers=headers, json={"custom_domain": custom_domain})
+                if update_response.status_code == 200:
+                    logging.info(f"사용자 지정 서브도메인 {custom_domain} 설정 완료")
+                    deploy_url = f"https://{custom_domain}"
+                else:
+                    logging.warning(f"사용자 지정 서브도메인 설정 실패: {update_response.text}")
+                    
+                             
             logging.info(f"배포 성공: {deploy_url}")
             return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
 
@@ -391,6 +403,10 @@ if st.session_state.api_key:
             st.session_state.primary_color,
             st.session_state.api_key
         )
+    # 사용자 지정 서브도메인 입력 필드 추가
+    custom_subdomain = st.text_input("사용자 지정 서브도메인 (선택사항, 예: mycompany):")
+    if custom_subdomain:
+        st.info(f"설정된 도메인: {custom_subdomain}.netlify.app")
     
     # 생성된 코드 표시
     if st.session_state.website_code:
@@ -410,7 +426,7 @@ if st.session_state.api_key:
             if st.session_state.website_code.strip().endswith("</html>"):
                 if st.button("Netlify에 배포하기"):
                     site_name = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
-                    deploy_result = deploy_to_netlify(st.session_state.website_code, site_name)
+                    deploy_result = deploy_to_netlify(st.session_state.website_code, site_name, custom_subdomain)
                     st.write(deploy_result)
             else:
                 st.warning("HTML 코드가 완전히 생성되지 않았습니다. 코드 생성이 완료되면 배포 버튼이 나타납니다.")
