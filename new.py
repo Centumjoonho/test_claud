@@ -262,52 +262,37 @@ def deploy_to_netlify(html_content, site_name):
         "Content-Type": "application/zip"
     }
 
-    netlify_toml_content = """
-[build]
-  publish = "/"
-  command = ""
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-"""
 
     try:
-        with io.BytesIO() as zip_buffer:
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                zip_file.writestr('index.html', html_content)
-                zip_file.writestr('netlify.toml', netlify_toml_content)
+        # ZIP 파일 생성
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            zip_file.writestr('index.html', html_content)
+        
+        zip_buffer.seek(0)
+        
+        # 사이트 생성 또는 기존 사이트 찾기
+        sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
+        sites_response.raise_for_status()
+        sites = sites_response.json()
+        site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
+        
+        if not site_id:
+            create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
+            create_site_response.raise_for_status()
+            site_id = create_site_response.json()['id']
 
-            zip_buffer.seek(0)
-            
-            logging.info(f"ZIP 파일 내용: {', '.join(zipfile.ZipFile(zip_buffer, 'r').namelist())}")
-            logging.info(f"생성된 ZIP 파일 크기: {zip_buffer.getbuffer().nbytes} bytes")
-
-            sites_response = requests.get(f"{netlify_api_url}/sites", headers=headers)
-            sites_response.raise_for_status()
-            sites = sites_response.json()
-            site_id = next((site['id'] for site in sites if site['name'] == site_name), None)
-
-            if not site_id:
-                create_site_response = requests.post(f"{netlify_api_url}/sites", headers=headers, json={"name": site_name})
-                create_site_response.raise_for_status()
-                site_id = create_site_response.json()['id']
-
-            logging.info(f"Netlify 배포 시작: {site_name} (ID: {site_id})")
-
-            deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
-            files = {'file': ('site.zip', zip_buffer.getvalue())}
-            response = requests.post(deploy_url, headers=headers, files=files)
-            
-            logging.info(f"Netlify API 응답 상태 코드: {response.status_code}")
-            logging.info(f"Netlify API 응답 내용: {response.text}")
-            
-            response.raise_for_status()
-
-            deploy_url = response.json()['deploy_ssl_url']
-            logging.info(f"배포 성공: {deploy_url}")
-            return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
+        logging.info(f"Netlify 배포 시작: {site_name}")
+        
+        # 배포
+        deploy_url = f"{netlify_api_url}/sites/{site_id}/deploys"
+        files = {'file': ('site.zip', zip_buffer.getvalue())}
+        response = requests.post(deploy_url, headers=headers, files=files)
+        response.raise_for_status()
+        
+        deploy_url = response.json()['deploy_ssl_url']
+        logging.info(f"배포 성공: {deploy_url}")
+        return f"웹사이트가 성공적으로 배포되었습니다. URL: {deploy_url}"
 
     except requests.exceptions.RequestException as e:
         logging.error(f"Netlify API 요청 중 오류 발생: {str(e)}")
