@@ -348,10 +348,14 @@ if st.session_state.api_key:
             st.subheader("웹사이트 미리보기")
             st.components.v1.html(st.session_state.website_code, height=1200, scrolling=True)
             
-            if st.button("Netlify에 배포하기"):
-                site_name = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
-                deploy_result = deploy_to_netlify(st.session_state.website_code, site_name)
-                st.write(deploy_result)
+            # HTML 코드가 완전히 생성되었을 때만 Netlify 배포 버튼 표시
+            if st.session_state.website_code.strip().endswith("</html>"):
+                if st.button("Netlify에 배포하기"):
+                    site_name = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
+                    deploy_result = deploy_to_netlify(st.session_state.website_code, site_name)
+                    st.write(deploy_result)
+            else:
+                st.warning("HTML 코드가 완전히 생성되지 않았습니다. 코드 생성이 완료되면 배포 버튼이 나타납니다.")
         else:
             st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
