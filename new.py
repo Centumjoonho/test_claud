@@ -264,13 +264,16 @@ def validate_html(html_content):
     return validator.errors
 
 def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, html_content, site_name):
-    params = {
-        "job": job_name,
-        "token": jenkins_token,
-        "html_content": html_content,
-        "site_name": site_name
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
     }
-    response = requests.get(jenkins_url, params=params)
+    data = {
+        'job': job_name,
+        'token': jenkins_token,
+        'html_content': html_content,
+        'site_name': site_name
+    }
+    response = requests.post(jenkins_url, headers=headers, data=data)
     if response.status_code == 200:
         build_info = response.json()
         build_number = build_info['build_number']
@@ -287,7 +290,9 @@ def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, ht
                 elif status_data['status'] in ['FAILURE', 'ABORTED']:
                     return None
     
-    return None
+    else:
+        logging.error(f"Jenkins 빌드 트리거 실패. 상태 코드: {response.status_code}")
+        return None
     
     
 def get_build_number_from_queue(queue_url, jenkins_user, jenkins_token):
@@ -432,22 +437,22 @@ if st.session_state.api_key:
     st.sidebar.write(f"회사명: {st.session_state.get('company_name', '미설정')}")
     st.sidebar.write(f"업종: {st.session_state.get('industry', '미설정')}")
     
-    # 사이드바에 Jenkins 빌드 버튼 추가
-    if st.sidebar.button("Jenkins로 빌드 및 배포"):
-        if st.session_state.website_code:
-            try:
-                result = trigger_jenkins_build(
-                    JENKINS_URL, 
-                    JENKINS_JOB_NAME, 
-                    JENKINS_USER, 
-                    JENKINS_TOKEN, 
-                    st.session_state.website_code
-                )
-                st.session_state.jenkins_build_result = result
-            except Exception as e:
-                st.session_state.jenkins_build_result = f"Jenkins 빌드 트리거 실패: {str(e)}"
-        else:
-            st.sidebar.error("배포할 웹사이트 코드가 없습니다.")
+    # # 사이드바에 Jenkins 빌드 버튼 추가
+    # if st.sidebar.button("Jenkins로 빌드 및 배포"):
+    #     if st.session_state.website_code:
+    #         try:
+    #             result = trigger_jenkins_build(
+    #                 JENKINS_URL, 
+    #                 JENKINS_JOB_NAME, 
+    #                 JENKINS_USER, 
+    #                 JENKINS_TOKEN, 
+    #                 st.session_state.website_code
+    #             )
+    #             st.session_state.jenkins_build_result = result
+    #         except Exception as e:
+    #             st.session_state.jenkins_build_result = f"Jenkins 빌드 트리거 실패: {str(e)}"
+    #     else:
+    #         st.sidebar.error("배포할 웹사이트 코드가 없습니다.")
 
     # 색상 변경 옵션
     new_color = st.sidebar.color_picker("주 색상 변경", st.session_state.get('primary_color', '#000000'))
