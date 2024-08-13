@@ -9,6 +9,7 @@ import zipfile
 import os
 from html.parser import HTMLParser
 import tempfile
+import time
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,11 @@ if 'api_key' not in st.session_state:
 UNSPLASH_CLIENT_ID = "AUo2EDi70vyR0pB5floEOnNAKq0SQjhvJFto0150dRM"  # 여기에 실제 Unsplash API 키를 입력하세요
 # Netlify API 토큰 하드 코딩
 NETLIFY_TOKEN = "nfp_4VYZWAKupMT3hroC9qVrqndCN1Q1oavy13e6"
+# Jenkins 설정 (실제 값으로 대체해야 함)
+JENKINS_URL = "https://ce66-119-198-28-251.ngrok-free.app/trigger-build"
+JENKINS_JOB_NAME = "generate-website"
+JENKINS_USER = "leejoonho"
+JENKINS_TOKEN = "1127b79140b11748719427866f5e56778f"
 
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
@@ -257,6 +263,62 @@ def validate_html(html_content):
     validator.feed(html_content)
     return validator.errors
 
+def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, html_content, site_name):
+    params = {
+        "job": job_name,
+        "token": jenkins_token,
+        "html_content": html_content,
+        "site_name": site_name
+    }
+    response = requests.get(jenkins_url, params=params)
+    if response.status_code == 200:
+        build_info = response.json()
+        build_number = build_info['build_number']
+        
+        # 빌드 완료 대기 (이 부분은 별도의 함수로 분리할 수 있습니다)
+        while True:
+            time.sleep(10)
+            status_url = f"{jenkins_url}/status?job={job_name}&build={build_number}"
+            status_response = requests.get(status_url)
+            if status_response.status_code == 200:
+                status_data = status_response.json()
+                if status_data['status'] == 'SUCCESS':
+                    return status_data['url']
+                elif status_data['status'] in ['FAILURE', 'ABORTED']:
+                    return None
+    
+    return None
+    
+    
+def get_build_number_from_queue(queue_url, jenkins_user, jenkins_token):
+    while True:
+        response = requests.get(queue_url, auth=(jenkins_user, jenkins_token))
+        if response.status_code == 200:
+            data = response.json()
+            if 'executable' in data and 'number' in data['executable']:
+                return data['executable']['number']
+        time.sleep(5)
+
+def wait_for_build_completion(jenkins_url, job_name, build_number, jenkins_user, jenkins_token):
+    while True:
+        build_url = f"{jenkins_url}/job/{job_name}/{build_number}/api/json"
+        response = requests.get(build_url, auth=(jenkins_user, jenkins_token))
+        if response.status_code == 200:
+            data = response.json()
+            if not data['building']:
+                return data['result']
+        time.sleep(10)    
+        
+def get_container_port(jenkins_url, job_name, build_number, jenkins_user, jenkins_token):
+    build_url = f"{jenkins_url}/job/{job_name}/{build_number}/consoleText"
+    response = requests.get(build_url, auth=(jenkins_user, jenkins_token))
+    if response.status_code == 200:
+        console_output = response.text
+        port_match = re.search(r"Website deployed at: http://localhost:(\d+)", console_output)
+        if port_match:
+            return port_match.group(1)
+    return None
+    
 def deploy_to_netlify(html_content, site_name):
     netlify_api_url = "https://api.netlify.com/api/v1"
     headers = {
@@ -336,6 +398,9 @@ st.title("AI 웹사이트 생성기 (OpenAI 버전)")
 # 세션 상태 초기화
 if 'deploy_result' not in st.session_state:
     st.session_state.deploy_result = None
+    
+if 'jenkins_build_result' not in st.session_state:
+    st.session_state.jenkins_build_result = None
 
 # API 키 입력
 api_key = st.text_input("OpenAI API 키를 입력해주세요:", type="password", value=st.session_state.api_key)
@@ -366,6 +431,23 @@ if st.session_state.api_key:
     # 현재 설정된 정보 표시
     st.sidebar.write(f"회사명: {st.session_state.get('company_name', '미설정')}")
     st.sidebar.write(f"업종: {st.session_state.get('industry', '미설정')}")
+    
+    # 사이드바에 Jenkins 빌드 버튼 추가
+    if st.sidebar.button("Jenkins로 빌드 및 배포"):
+        if st.session_state.website_code:
+            try:
+                result = trigger_jenkins_build(
+                    JENKINS_URL, 
+                    JENKINS_JOB_NAME, 
+                    JENKINS_USER, 
+                    JENKINS_TOKEN, 
+                    st.session_state.website_code
+                )
+                st.session_state.jenkins_build_result = result
+            except Exception as e:
+                st.session_state.jenkins_build_result = f"Jenkins 빌드 트리거 실패: {str(e)}"
+        else:
+            st.sidebar.error("배포할 웹사이트 코드가 없습니다.")
 
     # 색상 변경 옵션
     new_color = st.sidebar.color_picker("주 색상 변경", st.session_state.get('primary_color', '#000000'))
@@ -407,34 +489,54 @@ if st.session_state.api_key:
         if errors:
             st.warning(f"HTML 유효성 검사 오류: {errors}")
         
-        if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
-            st.subheader("웹사이트 미리보기")
-            st.components.v1.html(st.session_state.website_code, height=1200, scrolling=True)
-            
-            # HTML 코드가 완전히 생성되었을 때만 Netlify 배포 버튼 표시
-            if st.session_state.website_code.strip().endswith("</html>"):
-                site_name_input = st.text_input("사이트 이름을 입력하세요:", f"{st.session_state.company_name.lower().replace(' ', '-')}-site")
-                if st.button("Netlify에 배포하기"):
+    if st.session_state.website_code.strip().startswith("<!DOCTYPE html>"):
+        st.subheader("웹사이트 미리보기")
+        st.components.v1.html(st.session_state.website_code, height=1200, scrolling=True)
+        
+        # HTML 코드가 완전히 생성되었을 때 배포 옵션 제공
+        if st.session_state.website_code.strip().endswith("</html>"):
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Netlify에 배포"):
+                    site_name_input = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
                     st.session_state.deploying = True
-                    with st.spinner("배포 중... 잠시만 기다려주세요."):
+                    with st.spinner("Netlify에 배포 중..."):
                         deploy_result = deploy_to_netlify(st.session_state.website_code, site_name_input)
                         st.session_state.deploy_result = deploy_result
                     st.session_state.deploying = False
+            with col2:
+                if st.button("Jenkins로 빌드 및 Docker 배포"):
+                    with st.spinner("Jenkins 빌드 트리거 중..."):
+                        site_name = f"{st.session_state.company_name.lower().replace(' ', '-')}-site"
+                        result = trigger_jenkins_build(
+                            JENKINS_URL, 
+                            JENKINS_JOB_NAME, 
+                            JENKINS_USER, 
+                            JENKINS_TOKEN, 
+                            st.session_state.website_code,
+                            site_name
+                        )
+                        if result:
+                            st.session_state.jenkins_build_result = f"웹사이트가 성공적으로 배포되었습니다. URL: {result}"
+                            st.success(st.session_state.jenkins_build_result)
+                            st.markdown(f"[Docker 배포 웹사이트 열기]({result})")
+                        else:
+                            st.session_state.jenkins_build_result = "배포 실패"
+                            st.error(st.session_state.jenkins_build_result)
 
-                if st.session_state.deploy_result:
-                    st.success(st.session_state.deploy_result)
-                    if 'URL: ' in st.session_state.deploy_result:
-                        deploy_url = st.session_state.deploy_result.split('URL: ')[-1]
-                        st.markdown(f"[배포된 웹사이트 열기]({deploy_url})")
-                        st.markdown(f"`{deploy_url}` [복사하기](#)", unsafe_allow_html=True)
-                    else:
-                        st.warning("배포 URL을 찾을 수 없습니다.")
-                else:
-                    st.info("웹사이트가 준비되었습니다. '배포하기' 버튼을 클릭하여 배포를 시작하세요.")
-            else:
-                st.warning("HTML 코드가 완전히 생성되지 않았습니다. 코드 생성이 완료되면 배포 버튼이 나타납니다.")
+            if st.session_state.deploy_result:
+                st.success(st.session_state.deploy_result)
+                if 'URL: ' in st.session_state.deploy_result:
+                    deploy_url = st.session_state.deploy_result.split('URL: ')[-1]
+                    st.markdown(f"[Netlify 배포 웹사이트 열기]({deploy_url})")
+            
+            if st.session_state.jenkins_build_result:
+                st.info(st.session_state.jenkins_build_result)
+                st.markdown("Jenkins 대시보드에서 빌드 진행 상황을 확인하세요.")
         else:
-            st.error("유효한 HTML 코드가 생성되지 않았습니다.")
+            st.warning("HTML 코드가 완전히 생성되지 않았습니다. 코드 생성이 완료되면 배포 옵션이 나타납니다.")
+    else:
+        st.error("유효한 HTML 코드가 생성되지 않았습니다.")
 
     if st.button("대화 초기화"):
         for key in list(st.session_state.keys()):
