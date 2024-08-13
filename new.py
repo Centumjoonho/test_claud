@@ -270,7 +270,7 @@ def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, ht
         'X-API-Key': jenkins_token,  # API 키를 환경 변수에서 가져오는 것이 좋습니다
     }
     data = {
-        'job': job_name,
+        'job_name': job_name,
         'html_content': html_content,
         'site_name': site_name
     }
