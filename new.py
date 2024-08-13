@@ -10,6 +10,7 @@ import os
 from html.parser import HTMLParser
 import tempfile
 import time
+from requests.exceptions import RequestException
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -265,35 +266,51 @@ def validate_html(html_content):
 
 def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, html_content, site_name):
     headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
+        'X-API-Key': jenkins_token,  # API 키를 환경 변수에서 가져오는 것이 좋습니다
     }
     data = {
         'job': job_name,
-        'token': jenkins_token,
         'html_content': html_content,
         'site_name': site_name
     }
-    response = requests.post(jenkins_url, headers=headers, data=data)
-    if response.status_code == 200:
-        build_info = response.json()
-        build_number = build_info['build_number']
+    try:
+        response = requests.post(jenkins_url, headers=headers, json=data, timeout=30)
+        response.raise_for_status()
         
-        # 빌드 완료 대기 (이 부분은 별도의 함수로 분리할 수 있습니다)
-        while True:
-            time.sleep(10)
+        if response.status_code == 200:
+            build_info = response.json()
+            build_number = build_info['build_number']
+            return wait_for_build_completion(jenkins_url, job_name, build_number, jenkins_token)
+        else:
+            logging.error(f"Jenkins 빌드 트리거 실패. 상태 코드: {response.status_code}")
+            return None
+    except RequestException as e:
+        logging.error(f"Jenkins 빌드 트리거 중 오류 발생: {str(e)}")
+        return None
+
+def wait_for_build_completion(jenkins_url, job_name, build_number, jenkins_token, timeout=300):
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
             status_url = f"{jenkins_url}/status?job={job_name}&build={build_number}"
-            status_response = requests.get(status_url)
-            if status_response.status_code == 200:
-                status_data = status_response.json()
+            response = requests.get(status_url, headers={'X-API-Key': jenkins_token}, timeout=10)
+            response.raise_for_status()
+            
+            if response.status_code == 200:
+                status_data = response.json()
                 if status_data['status'] == 'SUCCESS':
                     return status_data['url']
                 elif status_data['status'] in ['FAILURE', 'ABORTED']:
+                    logging.error(f"빌드 실패: {status_data['status']}")
                     return None
+        except RequestException as e:
+            logging.error(f"빌드 상태 확인 중 오류 발생: {str(e)}")
+        
+        time.sleep(10)
     
-    else:
-        logging.error(f"Jenkins 빌드 트리거 실패. 상태 코드: {response.status_code}")
-        return None
-    
+    logging.error("빌드 완료 대기 시간 초과")
+    return None
     
 def get_build_number_from_queue(queue_url, jenkins_user, jenkins_token):
     while True:
