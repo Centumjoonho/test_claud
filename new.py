@@ -26,6 +26,8 @@ if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
 # if 'netlify_token' not in st.session_state:
 #     st.session_state.netlify_token = ""
+if 'deploying' not in st.session_state:
+    st.session_state.deploying = False
 
 # Unsplash API 키를 하드코딩
 UNSPLASH_CLIENT_ID = "AUo2EDi70vyR0pB5floEOnNAKq0SQjhvJFto0150dRM"  # 여기에 실제 Unsplash API 키를 입력하세요
@@ -416,11 +418,14 @@ if st.session_state.api_key:
                         st.session_state.deploy_result = deploy_result
                     st.session_state.deploying = False
 
-                if st.session_state.deploy_result:
-                    st.success(st.session_state.deploy_result)
+            if st.session_state.deploy_result:
+                st.success(st.session_state.deploy_result)
+                if 'URL: ' in st.session_state.deploy_result:
                     deploy_url = st.session_state.deploy_result.split('URL: ')[-1]
                     st.markdown(f"[배포된 웹사이트 열기]({deploy_url})")
                     st.markdown(f"`{deploy_url}` [복사하기](#)", unsafe_allow_html=True)
+                else:
+                    st.warning("배포 URL을 찾을 수 없습니다.")
             else:
                 st.warning("HTML 코드가 완전히 생성되지 않았습니다. 코드 생성이 완료되면 배포 버튼이 나타납니다.")
         else:
