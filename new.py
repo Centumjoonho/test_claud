@@ -37,7 +37,8 @@ NETLIFY_TOKEN = "nfp_4VYZWAKupMT3hroC9qVrqndCN1Q1oavy13e6"
 # Jenkins 설정 (실제 값으로 대체해야 함)
 JENKINS_URL = "https://8f61-119-198-28-251.ngrok-free.app/trigger-build"
 JENKINS_JOB_NAME = "generate-website"
-JENKINS_TOKEN = "mysecrettoken"
+JENKINS_USER = "leejoonho"
+JENKINS_TOKEN = "1127b79140b11748719427866f5e56778f"
 
 def init_openai_client(api_key):
     return OpenAI(api_key=api_key)
