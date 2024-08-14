@@ -264,59 +264,73 @@ def validate_html(html_content):
     validator.feed(html_content)
     return validator.errors
 
-def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, html_content, site_name):
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.html') as temp_file:
+def trigger_jenkins_build(jenkins_url, job_name, jenkins_token, html_content, site_name):
+    # 임시 파일 생성
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.html', encoding='utf-8') as temp_file:
         temp_file.write(html_content)
         temp_file_path = temp_file.name
 
-    headers = {
-        'Content-Type': 'application/json',
-        'X-API-Key': jenkins_token,
-    }
-    data = {
-        'job_name': job_name,
-        'html_file_path': temp_file_path,
-        'site_name': site_name
-    }
     try:
-        response = requests.post(jenkins_url, headers=headers, json=data, timeout=30)
+        # 파일 업로드를 위한 multipart/form-data 준비
+        files = {'file': ('index.html', open(temp_file_path, 'rb'), 'text/html')}
+        data = {
+            'job_name': job_name,
+            'site_name': site_name
+        }
+        headers = {
+            'X-API-Key': jenkins_token
+        }
+
+        # POST 요청 보내기
+        response = requests.post(jenkins_url, files=files, data=data, headers=headers, timeout=30)
         response.raise_for_status()
-        
-        # 임시 파일 삭제
-        os.unlink(temp_file_path)
-        
-        if response.status_code == 200:
+
+        if response.status_code == 202:  # 202 Accepted
             build_info = response.json()
             build_number = build_info['build_number']
+            logging.info(f"빌드가 성공적으로 트리거되었습니다. 빌드 번호: {build_number}")
             return wait_for_build_completion(jenkins_url, job_name, build_number, jenkins_token)
         else:
             logging.error(f"Jenkins 빌드 트리거 실패. 상태 코드: {response.status_code}")
             return None
+
     except RequestException as e:
         logging.error(f"Jenkins 빌드 트리거 중 오류 발생: {str(e)}")
-        # 오류 발생 시에도 임시 파일 삭제
-        os.unlink(temp_file_path)
         return None
+    finally:
+        # 임시 파일 삭제
+        if os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
 
 def wait_for_build_completion(jenkins_url, job_name, build_number, jenkins_token, timeout=300):
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            status_url = f"{jenkins_url}/status?job={job_name}&build={build_number}"
-            response = requests.get(status_url, headers={'X-API-Key': jenkins_token}, timeout=10)
+            # 빌드 상태 확인 URL 수정 (Jenkins API에 맞춰 조정)
+            status_url = f"{jenkins_url}/job/{job_name}/{build_number}/api/json"
+            headers = {
+                'Content-Type': 'application/json',
+                'X-API-Key': jenkins_token
+            }
+            response = requests.get(status_url, headers=headers, timeout=10)
             response.raise_for_status()
             
             if response.status_code == 200:
-                status_data = response.json()
-                if status_data['status'] == 'SUCCESS':
-                    return status_data['url']
-                elif status_data['status'] in ['FAILURE', 'ABORTED']:
-                    logging.error(f"빌드 실패: {status_data['status']}")
-                    return None
+                build_info = response.json()
+                if not build_info['building']:  # 빌드가 완료되었는지 확인
+                    if build_info['result'] == 'SUCCESS':
+                        logging.info(f"빌드 성공: {build_info['url']}")
+                        return build_info['url']
+                    else:
+                        logging.error(f"빌드 실패: {build_info['result']}")
+                        return None
+            else:
+                logging.warning(f"빌드 상태 확인 실패. 상태 코드: {response.status_code}")
+        
         except RequestException as e:
             logging.error(f"빌드 상태 확인 중 오류 발생: {str(e)}")
         
-        time.sleep(10)
+        time.sleep(10)  # 10초 대기 후 다시 확인
     
     logging.error("빌드 완료 대기 시간 초과")
     return None
