@@ -265,18 +265,25 @@ def validate_html(html_content):
     return validator.errors
 
 def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, html_content, site_name):
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.html') as temp_file:
+        temp_file.write(html_content)
+        temp_file_path = temp_file.name
+
     headers = {
         'Content-Type': 'application/json',
-        'X-API-Key': jenkins_token,  # API 키를 환경 변수에서 가져오는 것이 좋습니다
+        'X-API-Key': jenkins_token,
     }
     data = {
         'job_name': job_name,
-        'html_content': html_content,
+        'html_file_path': temp_file_path,
         'site_name': site_name
     }
     try:
         response = requests.post(jenkins_url, headers=headers, json=data, timeout=30)
         response.raise_for_status()
+        
+        # 임시 파일 삭제
+        os.unlink(temp_file_path)
         
         if response.status_code == 200:
             build_info = response.json()
@@ -287,6 +294,8 @@ def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, ht
             return None
     except RequestException as e:
         logging.error(f"Jenkins 빌드 트리거 중 오류 발생: {str(e)}")
+        # 오류 발생 시에도 임시 파일 삭제
+        os.unlink(temp_file_path)
         return None
 
 def wait_for_build_completion(jenkins_url, job_name, build_number, jenkins_token, timeout=300):
