@@ -35,7 +35,7 @@ UNSPLASH_CLIENT_ID = "AUo2EDi70vyR0pB5floEOnNAKq0SQjhvJFto0150dRM"  # 여기에 
 # Netlify API 토큰 하드 코딩
 NETLIFY_TOKEN = "nfp_4VYZWAKupMT3hroC9qVrqndCN1Q1oavy13e6"
 # Jenkins 설정 (실제 값으로 대체해야 함)
-JENKINS_URL = "https://72b7-119-198-28-251.ngrok-free.app/trigger-build"
+JENKINS_URL = "https://29b8-119-198-28-251.ngrok-free.app/trigger-build"
 JENKINS_JOB_NAME = "generate-website"
 JENKINS_USER = "leejoonho"
 JENKINS_TOKEN = "1127b79140b11748719427866f5e56778f"
