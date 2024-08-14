@@ -344,15 +344,6 @@ def get_build_number_from_queue(queue_url, jenkins_user, jenkins_token):
                 return data['executable']['number']
         time.sleep(5)
 
-def wait_for_build_completion(jenkins_url, job_name, build_number, jenkins_user, jenkins_token):
-    while True:
-        build_url = f"{jenkins_url}/job/{job_name}/{build_number}/api/json"
-        response = requests.get(build_url, auth=(jenkins_user, jenkins_token))
-        if response.status_code == 200:
-            data = response.json()
-            if not data['building']:
-                return data['result']
-        time.sleep(10)    
         
 def get_container_port(jenkins_url, job_name, build_number, jenkins_user, jenkins_token):
     build_url = f"{jenkins_url}/job/{job_name}/{build_number}/consoleText"
@@ -477,22 +468,6 @@ if st.session_state.api_key:
     st.sidebar.write(f"회사명: {st.session_state.get('company_name', '미설정')}")
     st.sidebar.write(f"업종: {st.session_state.get('industry', '미설정')}")
     
-    # # 사이드바에 Jenkins 빌드 버튼 추가
-    # if st.sidebar.button("Jenkins로 빌드 및 배포"):
-    #     if st.session_state.website_code:
-    #         try:
-    #             result = trigger_jenkins_build(
-    #                 JENKINS_URL, 
-    #                 JENKINS_JOB_NAME, 
-    #                 JENKINS_USER, 
-    #                 JENKINS_TOKEN, 
-    #                 st.session_state.website_code
-    #             )
-    #             st.session_state.jenkins_build_result = result
-    #         except Exception as e:
-    #             st.session_state.jenkins_build_result = f"Jenkins 빌드 트리거 실패: {str(e)}"
-    #     else:
-    #         st.sidebar.error("배포할 웹사이트 코드가 없습니다.")
 
     # 색상 변경 옵션
     new_color = st.sidebar.color_picker("주 색상 변경", st.session_state.get('primary_color', '#000000'))
@@ -556,7 +531,6 @@ if st.session_state.api_key:
                         result = trigger_jenkins_build(
                             JENKINS_URL, 
                             JENKINS_JOB_NAME, 
-                            JENKINS_USER, 
                             JENKINS_TOKEN, 
                             st.session_state.website_code,
                             site_name
