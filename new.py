@@ -283,9 +283,14 @@ def trigger_jenkins_build(jenkins_url, job_name, jenkins_token, html_content, si
 
         # POST 요청 보내기
         logging.info(f"Sending request to {jenkins_url}")
+        logging.info(f"Job name: {job_name}")
+        logging.info(f"Site name: {site_name}")
+        logging.info(f"HTML content length: {len(html_content)}")
+        
         response = requests.post(jenkins_url, files=files, data=data, headers=headers, timeout=30)
         logging.info(f"Response status code: {response.status_code}")
         logging.info(f"Response content: {response.text}")
+        
         response.raise_for_status()
 
         if response.status_code == 202:  # 202 Accepted
@@ -309,32 +314,33 @@ def wait_for_build_completion(jenkins_url, job_name, build_number, jenkins_token
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            # 빌드 상태 확인 URL 수정 (Jenkins API에 맞춰 조정)
-            status_url = f"{jenkins_url}/job/{job_name}/{build_number}/api/json"
+            # 빌드 상태 확인 URL (Flask 서버를 통해 확인)
+            status_url = f"{jenkins_url}/build-status/{job_name}/{build_number}"
             headers = {
-                'Content-Type': 'application/json',
                 'X-API-Key': jenkins_token
             }
             response = requests.get(status_url, headers=headers, timeout=10)
-            response.raise_for_status()
+            logging.info(f"Build status check response: {response.status_code}")
+            logging.info(f"Build status content: {response.text}")
             
+            response.raise_for_status()
+
             if response.status_code == 200:
                 build_info = response.json()
-                if not build_info['building']:  # 빌드가 완료되었는지 확인
-                    if build_info['result'] == 'SUCCESS':
-                        logging.info(f"빌드 성공: {build_info['url']}")
-                        return build_info['url']
-                    else:
-                        logging.error(f"빌드 실패: {build_info['result']}")
-                        return None
+                if build_info['result'] == 'SUCCESS':
+                    logging.info(f"빌드 성공: {build_info['url']}")
+                    return build_info['url']
+                elif build_info['result'] in ['FAILURE', 'ABORTED']:
+                    logging.error(f"빌드 실패: {build_info['result']}")
+                    return None
             else:
                 logging.warning(f"빌드 상태 확인 실패. 상태 코드: {response.status_code}")
-        
+
         except RequestException as e:
             logging.error(f"빌드 상태 확인 중 오류 발생: {str(e)}")
-        
+
         time.sleep(10)  # 10초 대기 후 다시 확인
-    
+
     logging.error("빌드 완료 대기 시간 초과")
     return None
     
