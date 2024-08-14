@@ -282,7 +282,10 @@ def trigger_jenkins_build(jenkins_url, job_name, jenkins_token, html_content, si
         }
 
         # POST 요청 보내기
+        logging.info(f"Sending request to {jenkins_url}")
         response = requests.post(jenkins_url, files=files, data=data, headers=headers, timeout=30)
+        logging.info(f"Response status code: {response.status_code}")
+        logging.info(f"Response content: {response.text}")
         response.raise_for_status()
 
         if response.status_code == 202:  # 202 Accepted
