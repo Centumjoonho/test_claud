@@ -266,7 +266,7 @@ def validate_html(html_content):
 
 def trigger_jenkins_build(jenkins_url, job_name, jenkins_user, jenkins_token, html_content, site_name):
     headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
         'X-API-Key': jenkins_token,  # API 키를 환경 변수에서 가져오는 것이 좋습니다
     }
     data = {
